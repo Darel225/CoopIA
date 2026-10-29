@@ -1,427 +1,525 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+/**
+ * CoopIA — OTP Verification Screen (auth/verify-otp.jsx)
+ *
+ * 6 cases de saisie premium, clavier natif.
+ * ANTI-BUG ANDROID : Aucune ombre dynamique sur les cases (Platform.select strict).
+ * Logique de brute-force (5 essais max) et countdown de renvoi préservés.
+ */
+
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
+  TextInput,
   TouchableOpacity,
-  Animated,
-  Vibration,
-  Dimensions,
   Alert,
+  Platform,
+  ScrollView,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
+import ScreenWrapper from '../../components/layout/ScreenWrapper';
+import CustomButton from '../../components/ui/CustomButton';
 import Colors from '../../constants/Colors';
-import { authService } from '../../services/authService';
+import { Typography } from '../../constants/Styles';
+import { BASE_URL } from '../../constants/api';
 import { useUserStore } from '../../store/useUserStore';
 
-const { width } = Dimensions.get('window');
-const CODE_LENGTH = 6;
-const BOX_SIZE = (width - 48 - (CODE_LENGTH - 1) * 12) / CODE_LENGTH;
-
-const KEYS = [
-  ['1', '2', '3'],
-  ['4', '5', '6'],
-  ['7', '8', '9'],
-  ['', '0', 'delete'],
-];
+const OTP_LENGTH = 6;
+const MAX_ATTEMPTS = 5;
+const RESEND_DELAY = 60; // secondes
 
 export default function VerifyOtpScreen() {
-  const [code, setCode] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
-  const [countdown, setCountdown] = useState(59);
+  const { phone_number, auto_code } = useLocalSearchParams();
   const router = useRouter();
-  // Récupère l'adresse e-mail transmise depuis l'écran de connexion
-  const { email } = useLocalSearchParams();
-  const insets = useSafeAreaInsets();
-  // Récupère setUserData et login depuis le store global
-  const { setUserData, login } = useUserStore();
+  const { login, setUserData } = useUserStore();
 
-  // Animation shake sur erreur
-  const shakeAnim = useRef(new Animated.Value(0)).current;
-  // Animation scale sur chaque touche
-  const keyScales = useRef(
-    KEYS.flat().reduce((acc, k) => ({ ...acc, [k]: new Animated.Value(1) }), {})
-  ).current;
+  // ─── État du code OTP ────────────────────────────────────────────────────
+  const [digits, setDigits] = useState(Array(OTP_LENGTH).fill(''));
+  const [focusedIndex, setFocusedIndex] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [attempts, setAttempts] = useState(0);
 
-  // Compte Ã  rebours "renvoyer"
+  // ─── Countdown de renvoi ──────────────────────────────────────────────────
+  const [countdown, setCountdown] = useState(RESEND_DELAY);
+  const [resending, setResending] = useState(false);
+  const timerRef = useRef(null);
+
+  // Références vers les inputs pour le passage automatique de focus
+  const inputRefs = useRef(Array(OTP_LENGTH).fill(null).map(() => React.createRef()));
+
   useEffect(() => {
-    if (countdown <= 0) return;
-    const id = setInterval(() => setCountdown(c => c - 1), 1000);
-    return () => clearInterval(id);
+    if (!phone_number) {
+      router.replace('/(auth)/login');
+      return;
+    }
+    startTimer();
+    setTimeout(() => inputRefs.current[0]?.current?.focus(), 300);
+    return () => clearInterval(timerRef.current);
   }, []);
 
-  const triggerShake = () => {
-    Vibration.vibrate(200);
-    shakeAnim.setValue(0);
-    Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 10, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -10, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 8, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 0, duration: 60, useNativeDriver: true }),
-    ]).start();
-  };
-
-  const animateKey = (key) => {
-    if (!keyScales[key]) return;
-    Animated.sequence([
-      Animated.spring(keyScales[key], { toValue: 0.85, useNativeDriver: true, speed: 50 }),
-      Animated.spring(keyScales[key], { toValue: 1, useNativeDriver: true, speed: 30 }),
-    ]).start();
-  };
-
-  const handleKeyPress = (key) => {
-    if (!key) return;
-    animateKey(key);
-    setError(false);
-    if (key === 'delete') {
-      setCode(prev => prev.slice(0, -1));
-    } else if (code.length < CODE_LENGTH) {
-      setCode(prev => prev + key);
+  useEffect(() => {
+    if (auto_code) {
+      const codeArray = auto_code.split('');
+      setDigits(codeArray); // Visually fill
+      setTimeout(async () => {
+        await handleVerify(auto_code);
+      }, 500); // 500ms delay for UX (shows the filled boxes before redirect)
     }
+  }, [auto_code]);
+
+
+  const maskedPhone = phone_number
+    ? `${phone_number.slice(0, 4)} ${phone_number.slice(4, 6)} •••• ${phone_number.slice(-2)}`
+    : '••••';
+
+  const startTimer = () => {
+    clearInterval(timerRef.current);
+    setCountdown(RESEND_DELAY);
+    timerRef.current = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) { clearInterval(timerRef.current); return 0; }
+        return c - 1;
+      });
+    }, 1000);
   };
 
-  const handleVerify = async () => {
-    if (code.length !== CODE_LENGTH) return;
-    setLoading(true);
-    try {
-      // Appel vers le webhook n8n de vérification du code OTP
-      const result = await authService.verifyOtp(email, code);
+  // ─── Gestion de la saisie dans chaque case ───────────────────────────────
+  const handleDigitChange = useCallback((text, index) => {
+    const char = text.replace(/\D/g, '').slice(-1);
+    const newDigits = [...digits];
+    newDigits[index] = char;
+    setDigits(newDigits);
+    setErrorMsg('');
 
-      if (result.isValid) {
-        if (result.isNewUser) {
-          // Nouvel utilisateur : redirige vers l'écran de configuration du profil
-          router.push({ pathname: '/(auth)/profile-setup', params: { email } });
-        } else {
-          // Utilisateur existant : sauvegarde ses données et accède directement Ã  l'app
-          const user = result.user || {};
-          setUserData({
-            userId: user.id || null,
-            nom: user.nom || null,
-            prenom: user.prenom || null,
-            firstName: user.prenom || null,   // alias pour l'UI
-            email: user.email || email,       // adresse e-mail de l'utilisateur
-            ville: user.ville_par_defaut || null,
-            quartier: user.quartier_par_defaut || null,
-            zone: user.quartier_par_defaut || null,
-          });
-          login();
-          // Remplace le stack d'auth par l'application principale
-          router.replace('/(tabs)');
+    if (char && index < OTP_LENGTH - 1) {
+      inputRefs.current[index + 1]?.current?.focus();
+    }
+    if (char && index === OTP_LENGTH - 1) {
+      inputRefs.current[index]?.current?.blur();
+    }
+  }, [digits]);
+
+  const handleKeyPress = useCallback((e, index) => {
+    if (e.nativeEvent.key === 'Backspace' && !digits[index] && index > 0) {
+      const newDigits = [...digits];
+      newDigits[index - 1] = '';
+      setDigits(newDigits);
+      inputRefs.current[index - 1]?.current?.focus();
+    }
+  }, [digits]);
+
+  // ─── Validation du code ───────────────────────────────────────────────────
+  const handleVerify = async (autoCodeOverride = null) => {
+    if (loading) return;
+    
+    const code = autoCodeOverride || digits.join('');
+    if (code.length < OTP_LENGTH) {
+      setErrorMsg('Veuillez entrer les 6 chiffres du code.');
+      return;
+    }
+    if (attempts >= MAX_ATTEMPTS) {
+      setErrorMsg('Trop de tentatives. Renvoyez un nouveau code.');
+      return;
+    }
+
+    setLoading(true);
+    setErrorMsg('');
+
+    try {
+      const response = await fetch(`${BASE_URL}/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone_number, code })
+      });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        let errorMsg = 'La vérification a échoué. Réessayez.';
+        if (data && data.detail) {
+          errorMsg = Array.isArray(data.detail) ? data.detail[0].msg : data.detail;
         }
-      } else {
-        // Code incorrect : animation shake + réinitialisation
-        setError(true);
-        setCode('');
-        triggerShake();
+        
+        const newAttempts = attempts + 1;
+        setAttempts(newAttempts);
+        
+        if (response.status === 400) {
+          setErrorMsg(errorMsg);
+          setDigits(Array(OTP_LENGTH).fill('')); // Nettoyage sur code invalide
+          setTimeout(() => inputRefs.current[0]?.current?.focus(), 100);
+        } else if (response.status === 429) {
+          setErrorMsg(errorMsg); // Ne pas vider la grille sur too many attempts
+        } else {
+          setErrorMsg(errorMsg);
+        }
+        return;
       }
-    } catch (e) {
-      if (__DEV__) { console.error('[VerifyOtpScreen]', e); }
-      Alert.alert('Erreur', e.message || 'La vérification a échoué. Réessayez.');
+      
+      // Stockage sécurisé du JWT
+      if (data.access_token) {
+        if (Platform.OS !== 'web') {
+          await SecureStore.setItemAsync('userToken', data.access_token);
+        } else {
+          try { localStorage.setItem('userToken', data.access_token); } catch(e) {}
+        }
+      }
+      
+      // Extraction et vérification des informations utilisateur
+      const user = data.user || {};
+      const firstName = user.first_name ? String(user.first_name).trim() : '';
+      const lastName = user.last_name ? String(user.last_name).trim() : '';
+
+      // Critère strict : un utilisateur est complet s'il a un prénom non vide ET requires_profile_setup est false
+      const isProfileComplete = Boolean(firstName.length > 0 && !data.requires_profile_setup);
+
+      // Nettoyage prealable de l'etat pour eviter toute fuite de cache de l'ancien utilisateur
+      useUserStore.getState().logout();
+
+      // Mise à jour de l'état global Zustand avec les données réelles du profil
+      setUserData({
+        userId: user.id || null,
+        firstName: firstName || null,
+        prenom: firstName || null,
+        nom: lastName || null,
+        phone: user.phone_number || phone_number,
+        cooperative_id: user.cooperative_id || null,
+        cooperative_name: user.cooperative_name || 'Coopérative CAPED',
+        role: user.role || 'PLANTER',
+        zone: user.village || null,
+        quartier: user.village || null,
+        crops: user.culture ? [user.culture] : [],
+      });
+
+      if (isProfileComplete) {
+        // Utilisateur existant (profil complété) -> interface principale
+        login(); // Met à jour l'état global Zustand (isAuthenticated = true)
+        router.replace('/(tabs)');
+      } else {
+        // Nouvel utilisateur ou profil incomplet -> écran de complétion de profil
+        router.replace({
+          pathname: '/(auth)/profile-setup',
+          params: { phone_number, userId: user.id },
+        });
+      }
+      
+    } catch (error) {
+      setErrorMsg("Erreur de connexion au serveur.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Valide automatiquement quand les 5 chiffres sont saisis
-  useEffect(() => {
-    if (code.length === CODE_LENGTH) handleVerify();
-  }, [code]);
+  // ─── Renvoi du code ───────────────────────────────────────────────────────
+  const handleResend = async () => {
+    if (countdown > 0 || resending) return;
+    setResending(true);
+    setErrorMsg('');
+    setAttempts(0);
+    setDigits(Array(OTP_LENGTH).fill(''));
+    try {
+      const response = await fetch(`${BASE_URL}/auth/request-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone_number })
+      });
+      const data = await response.json().catch(() => null);
 
-  const handleResend = () => {
-    if (countdown > 0) return;
-    setCountdown(59);
-    setCode('');
-    setError(false);
-    // Renvoie un nouveau code OTP vers l'adresse e-mail via le webhook n8n
-    authService.requestOtp(email).catch(console.error);
+      if (!response.ok) {
+        let errorMsg = "Impossible d'envoyer le code.";
+        if (data && data.detail) {
+          errorMsg = Array.isArray(data.detail) ? data.detail[0].msg : data.detail;
+        }
+        Alert.alert('Erreur', errorMsg);
+        return;
+      }
+
+      startTimer();
+      Alert.alert('Code envoyé', 'Un nouveau code a été envoyé.');
+    } catch (error) {
+      Alert.alert('Erreur de connexion', "Erreur de connexion au serveur.");
+    } finally {
+      setResending(false);
+    }
   };
 
-  return (
-    <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      {/* â”€â”€â”€ En-tête â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={Colors.text} />
-        </TouchableOpacity>
-      </View>
+  const codeComplete = digits.every(Boolean);
 
-      {/* â”€â”€â”€ Contenu principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <View style={styles.content}>
-        {/* Icône décorative */}
-        <View style={styles.iconBadge}>
-          <Ionicons name="shield-checkmark" size={32} color={Colors.primary} />
+  return (
+    <ScreenWrapper withKeyboard noPadding backgroundColor={Colors.background}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ─── Bouton retour ────────────────────────────────────────────── */}
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={22} color={Colors.text} />
+        </TouchableOpacity>
+
+        {/* ─── Titre & Sous-titre ───────────────────────────────────────── */}
+        <View style={styles.headerSection}>
+          <View style={styles.iconBadge}>
+            <Ionicons name="shield-checkmark-outline" size={30} color={Colors.primary} />
+          </View>
+          <Text style={styles.title}>Vérification</Text>
+          <Text style={styles.subtitle}>
+            Veuillez entrer le code à 6 chiffres{'\n'}envoyé au{' '}
+            <Text style={styles.phoneHighlight}>{maskedPhone}</Text>
+          </Text>
         </View>
 
-        <Text style={styles.title}>Vérification</Text>
-        <Text style={styles.subtitle}>
-          Code envoyé à l'adresse{'\n'}
-          <Text style={styles.phoneHighlight}>{email || 'votre@email.com'}</Text>
-        </Text>
-
-        {/* â”€â”€â”€ Cases OTP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-        <Animated.View
-          style={[styles.otpRow, { transform: [{ translateX: shakeAnim }] }]}
-        >
-          {Array.from({ length: CODE_LENGTH }).map((_, i) => {
-            const filled = i < code.length;
-            const active = i === code.length;
-            return (
+        {/* ─── Cases OTP ────────────────────────────────────────────────── */}
+        <View style={styles.otpSection}>
+          <View style={styles.otpRow}>
+            {digits.map((digit, index) => (
               <View
-                key={i}
+                key={index}
                 style={[
                   styles.otpBox,
-                  active && styles.otpBoxActive,
-                  filled && styles.otpBoxFilled,
-                  error && styles.otpBoxError,
+                  focusedIndex === index && styles.otpBoxFocused,
+                  digit && styles.otpBoxFilled,
+                  !!errorMsg && styles.otpBoxError,
                 ]}
               >
-                {filled ? (
-                  <View style={styles.otpDot} />
+                <TextInput
+                  ref={inputRefs.current[index]}
+                  style={styles.otpInput}
+                  value={digit}
+                  onChangeText={(t) => handleDigitChange(t, index)}
+                  onKeyPress={(e) => handleKeyPress(e, index)}
+                  onFocus={() => setFocusedIndex(index)}
+                  onBlur={() => setFocusedIndex(-1)}
+                  keyboardType="number-pad"
+                  maxLength={2}
+                  selectTextOnFocus
+                  caretHidden
+                  textAlign="center"
+                />
+                {/* Affichage visuel : point masqué si rempli, tiret si vide */}
+                {digit ? (
+                  <View style={styles.filledDot} />
                 ) : (
-                  <Text style={styles.otpPlaceholder}>–</Text>
+                  <Text style={styles.emptyDash}>-</Text>
                 )}
               </View>
-            );
-          })}
-        </Animated.View>
-
-        {/* Message d'erreur */}
-        {error && (
-          <Text style={styles.errorText}>
-            <Ionicons name="close-circle-outline" size={13} /> Code incorrect. Réessayez.
-          </Text>
-        )}
-
-        {/* Renvoyer le code */}
-        <TouchableOpacity onPress={handleResend} disabled={countdown > 0} style={styles.resendRow}>
-          <Text style={[styles.resendText, countdown > 0 && styles.resendDisabled]}>
-            Renvoyer le code
-          </Text>
-          {countdown > 0 && (
-            <Text style={styles.countdown}> ({countdown}s)</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {/* â”€â”€â”€ Clavier numérique â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      <View style={styles.keypad}>
-        {KEYS.map((row, ri) => (
-          <View key={ri} style={styles.keyRow}>
-            {row.map((key, ki) => (
-              <Animated.View
-                key={ki}
-                style={[
-                  styles.keyWrap,
-                  key && { transform: [{ scale: keyScales[key] ?? 1 }] },
-                ]}
-              >
-                <TouchableOpacity
-                  style={[styles.key, !key && styles.keyEmpty]}
-                  onPress={() => handleKeyPress(key)}
-                  disabled={!key || loading}
-                  activeOpacity={0.85}
-                >
-                  {key === 'delete' ? (
-                    <Ionicons name="backspace-outline" size={26} color={Colors.text} />
-                  ) : (
-                    <Text style={styles.keyText}>{key}</Text>
-                  )}
-                </TouchableOpacity>
-              </Animated.View>
             ))}
           </View>
-        ))}
 
-        {/* Indicateur de chargement sous le clavier */}
-        {loading && (
-          <View style={styles.loadingRow}>
-            <Text style={styles.loadingText}>Vérification en cours...</Text>
-          </View>
-        )}
+          {/* Message d'erreur */}
+          {!!errorMsg && (
+            <View style={styles.errorRow}>
+              <Ionicons name="alert-circle-outline" size={14} color={Colors.error} />
+              <Text style={styles.errorText}>{errorMsg}</Text>
+            </View>
+          )}
+
+          {/* Renvoyer le code */}
+          <TouchableOpacity
+            style={styles.resendRow}
+            onPress={handleResend}
+            disabled={countdown > 0 || resending}
+          >
+            {countdown > 0 ? (
+              <Text style={styles.countdown}>
+                Renvoyer le code dans{' '}
+                <Text style={styles.countdownNum}>{countdown}s</Text>
+              </Text>
+            ) : (
+              <Text style={[styles.resendText, resending && styles.resendDisabled]}>
+                {resending ? 'Envoi en cours...' : 'Renvoyer le code'}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      {/* ─── CTA épinglé en bas ───────────────────────────────────────── */}
+      <View style={styles.footer}>
+        <CustomButton
+          title="Valider"
+          onPress={handleVerify}
+          loading={loading}
+          disabled={!codeComplete || attempts >= MAX_ATTEMPTS || loading}
+          style={styles.ctaButton}
+        />
       </View>
-    </View>
+    </ScreenWrapper>
   );
 }
 
+// Taille des cases calculée pour tenir sur tous les écrans (6 cases + 5 gaps)
+const BOX_SIZE = 46;
+
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: Colors.background,
+  scroll: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 16,
   },
 
-  // â”€â”€â”€ Top bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  topBar: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
+  // ─── Bouton retour ────────────────────────────────────────────────────────
   backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 42,
+    height: 42,
+    borderRadius: 13,
     backgroundColor: Colors.gray,
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 32,
   },
 
-  // â”€â”€â”€ Contenu â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 12,
+  // ─── Header ───────────────────────────────────────────────────────────────
+  headerSection: {
     alignItems: 'center',
+    marginBottom: 40,
   },
   iconBadge: {
-    width: 72,
-    height: 72,
+    width: 64,
+    height: 64,
     borderRadius: 20,
-    backgroundColor: `${Colors.primary}15`,
+    backgroundColor: Colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
   },
   title: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    color: Colors.text,
-    marginBottom: 10,
+    ...Typography.h1,
+    fontSize: 28,
+    fontWeight: '800',
     textAlign: 'center',
+    marginBottom: 12,
+    letterSpacing: -0.3,
   },
   subtitle: {
-    fontSize: 14,
-    color: Colors.textLight,
+    ...Typography.body,
     textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 32,
+    color: Colors.textLight,
+    lineHeight: 24,
   },
   phoneHighlight: {
     color: Colors.text,
     fontWeight: '700',
   },
 
-  // â”€â”€â”€ Cases OTP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Zone OTP ─────────────────────────────────────────────────────────────
+  otpSection: {
+    alignItems: 'center',
+  },
   otpRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
+    width: '100%',
+    maxWidth: 360,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 4,
   },
+
+  // Case OTP — CRITIQUE Android : aucune ombre dynamique au focus
   otpBox: {
-    width: BOX_SIZE,
-    height: BOX_SIZE * 1.15,
+    flex: 1,
+    maxWidth: 48,
+    aspectRatio: 0.85,
+    marginHorizontal: 3,
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: Colors.border,
     backgroundColor: Colors.gray,
     justifyContent: 'center',
     alignItems: 'center',
+    // Pré-déclare elevation à 0 pour éviter le bug View Recreation sur Android
+    ...Platform.select({ android: { elevation: 0 }, ios: {} }),
   },
-  otpBoxActive: {
+
+  // Focalisé — uniquement borderColor + backgroundColor (pas d'ombre dynamique)
+  otpBoxFocused: {
     borderColor: Colors.primary,
     borderWidth: 2,
-    backgroundColor: '#fff',
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 3,
+    backgroundColor: Colors.white,
   },
+
+  // Rempli
   otpBoxFilled: {
     borderColor: Colors.primary,
-    backgroundColor: `${Colors.primary}12`,
+    backgroundColor: Colors.primaryLight,
   },
+
+  // Erreur
   otpBoxError: {
     borderColor: Colors.error,
     backgroundColor: `${Colors.error}10`,
   },
-  otpDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+
+  // L'input est masqué — on affiche notre propre dot/dash
+  otpInput: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    opacity: 0,
+    color: 'transparent',
+  },
+
+  // Dot plein vert quand rempli
+  filledDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     backgroundColor: Colors.primary,
   },
-  otpPlaceholder: {
-    fontSize: 18,
+
+  // Tiret quand vide
+  emptyDash: {
+    fontSize: 20,
     color: Colors.border,
     fontWeight: '300',
+    lineHeight: 24,
   },
 
-  // â”€â”€â”€ Erreur â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  errorText: {
-    color: Colors.error,
-    fontSize: 13,
-    marginBottom: 12,
-  },
-
-  // â”€â”€â”€ Renvoyer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  resendRow: {
+  // ─── Erreur ───────────────────────────────────────────────────────────────
+  errorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    gap: 5,
+    marginBottom: 16,
+  },
+  errorText: {
+    ...Typography.bodySmall,
+    color: Colors.error,
+  },
+
+  // ─── Renvoi ───────────────────────────────────────────────────────────────
+  resendRow: {
+    paddingVertical: 8,
   },
   resendText: {
-    color: Colors.primary,
+    ...Typography.body,
     fontWeight: '600',
-    fontSize: 14,
+    color: Colors.primary,
   },
   resendDisabled: {
-    color: Colors.textLight,
+    color: Colors.textMuted,
   },
   countdown: {
+    ...Typography.bodySmall,
     color: Colors.textLight,
-    fontSize: 14,
   },
-
-  // â”€â”€â”€ Clavier â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  keypad: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-  },
-  keyRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  keyWrap: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  key: {
-    width: 76,
-    height: 64,
-    borderRadius: 18,
-    backgroundColor: Colors.gray,
-    justifyContent: 'center',
-    alignItems: 'center',
-    // Ombre subtile pour un effet "touche de téléphone"
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  keyEmpty: {
-    backgroundColor: 'transparent',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  keyText: {
-    fontSize: 26,
-    fontWeight: '500',
+  countdownNum: {
+    fontWeight: '700',
     color: Colors.text,
   },
 
-  // â”€â”€â”€ Chargement â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  loadingRow: {
-    alignItems: 'center',
-    paddingTop: 4,
+  // ─── Footer CTA ───────────────────────────────────────────────────────────
+  footer: {
+    paddingHorizontal: 24,
+    paddingBottom: 32,
+    paddingTop: 8,
   },
-  loadingText: {
-    color: Colors.primary,
-    fontSize: 13,
-    fontWeight: '500',
+  ctaButton: {
+    borderRadius: 18,
+    height: 58,
   },
 });
-

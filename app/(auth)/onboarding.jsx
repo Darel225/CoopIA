@@ -1,148 +1,183 @@
-import React, { useState } from 'react';
-import { Image, View, Text, StyleSheet, Dimensions } from 'react-native';
+﻿/**
+ * CoopIA — Onboarding Screen (auth/onboarding.jsx)
+ *
+ * Premier écran de bienvenue après le Splash.
+ * Layout : Image hero dans un conteneur arrondi avec marges, titre,
+ * sous-titre, indicateurs de pagination, puis bouton CTA "Commencer" épinglé en bas.
+ */
+
+import React from 'react';
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  Platform,
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import Colors from '../../constants/Colors';
-import CustomButton from '../../components/ui/CustomButton';
 import ScreenWrapper from '../../components/layout/ScreenWrapper';
-import IaLogo from '../../assets/images/IaLogo.png'
-import ArtisanLogo from '../../assets/images/ArtisanLogo.png'
-import ContactLogo from '../../assets/images/ContactLogo.png'
+import CustomButton from '../../components/ui/CustomButton';
+import Colors from '../../constants/Colors';
+import { Typography } from '../../constants/Styles';
 
-const { width } = Dimensions.get('window');
-
-const SLIDES = [
-  {
-    id: '1',
-    title: 'Discutez avec notre IA',
-    description: 'Exprimez votre besoin en texte ou par message vocal comme sur votre messagerie préférée. Notre IA comprend tout instantanément.',
-    image: IaLogo,
-  },
-  {
-    id: '2',
-    title: "Trouvez l'artisan idéal",
-    description: 'Recevez instantanément les recommandations des meilleurs prestataires (plombiers, électriciens, livreurs) disponibles dans votre commune.',
-    image: ArtisanLogo,
-  },
-  {
-    id: '3',
-    title: 'Contactez en un clic',
-    description: 'Appelez directement le professionnel par GSM ou lancez une discussion sur WhatsApp pour finaliser votre prestation en toute simplicité.',
-    image: ContactLogo,
-  }
-];
+// Asset local généré pour le projet CoopIA
+const HERO_IMAGE = require('../../assets/images/onboarding_hero.jpg');
 
 export default function OnboardingScreen() {
-  const [currentIndex, setCurrentIndex] = useState(0);
   const router = useRouter();
 
-  const handleNext = () => {
-    if (currentIndex < SLIDES.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-    } else {
-      router.push('/(auth)/login');
-    }
+  const handleStart = () => {
+    router.replace('/(auth)/login');
   };
 
-  const slide = SLIDES[currentIndex];
-
   return (
-    <ScreenWrapper style={styles.container}>
-      <View style={styles.content}>
-        {/* Image d'illustration dynamique selon la slide active */}
-        <View style={styles.imagePlaceholder}>
+    <ScreenWrapper noPadding backgroundColor={Colors.background}>
+      <View style={styles.root}>
+
+        {/* ─── Zone supérieure : Image Hero ─────────────────────────────── */}
+        <View style={styles.heroContainer}>
           <Image
-            source={slide.image}
-            style={styles.illustrationImage}
-            resizeMode="contain"
+            source={HERO_IMAGE}
+            style={styles.heroImage}
+            resizeMode="cover"
           />
         </View>
 
-        <View style={styles.textContainer}>
-          <Text style={styles.title}>{slide.title}</Text>
-          <Text style={styles.description}>{slide.description}</Text>
+        {/* ─── Zone centrale : Titre + Sous-titre + Pagination ──────────── */}
+        <View style={styles.contentArea}>
+          {/* Titre principal */}
+          <Text style={styles.title}>Cultivez avec l'IA</Text>
+
+          {/* Sous-titre */}
+          <Text style={styles.subtitle}>
+            Prenez en photo vos cultures, déclarez vos récoltes et recevez des
+            conseils d'experts instantanément.
+          </Text>
+
+          {/* Indicateurs de pagination */}
+          <View style={styles.paginationRow}>
+            {/* Indicateur actif — pilule allongée Forest Green */}
+            <View style={[styles.dot, styles.dotActive]} />
+            {/* Indicateurs inactifs — petits cercles gris clair */}
+            <View style={[styles.dot, styles.dotInactive]} />
+            <View style={[styles.dot, styles.dotInactive]} />
+          </View>
         </View>
 
-        {/* Indicateurs de points */}
-        <View style={styles.dotContainer}>
-          {SLIDES.map((_, index) => (
-            <View 
-              key={index} 
-              style={[
-                styles.dot, 
-                currentIndex === index && styles.activeDot
-              ]} 
-            />
-          ))}
+        {/* ─── Zone basse : CTA épinglé ──────────────────────────────────── */}
+        <View style={styles.footer}>
+          <CustomButton
+            title="Commencer"
+            onPress={handleStart}
+            variant="primary"
+            style={styles.ctaButton}
+          />
         </View>
-      </View>
 
-      <View style={styles.footer}>
-        <CustomButton 
-          title={currentIndex === SLIDES.length - 1 ? "Commencer" : "Suivant"} 
-          onPress={handleNext} 
-        />
       </View>
     </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 20,
-    justifyContent: 'space-between',
-  },
-  content: {
+  // ─── Root : distribue les 3 zones verticalement ───────────────────────────
+  root: {
     flex: 1,
-    alignItems: 'center',
-    paddingTop: 40,
+    backgroundColor: Colors.background,
+    justifyContent: 'space-between',
+    paddingBottom: 32,
   },
-  imagePlaceholder: {
-    width: width * 0.8,
-    height: width * 0.8,
-    backgroundColor: Colors.gray,
-    borderRadius: 20,
+
+  // ─── Conteneur image hero ──────────────────────────────────────────────────
+  // Le conteneur a des marges et coins arrondis — l'image ne saigne pas sur les bords
+  heroContainer: {
+    alignSelf: 'center',
+    width: '90%',
+    maxWidth: 340,
+    aspectRatio: 1,
+    maxHeight: 310,
+    marginTop: 16,
+    borderRadius: 36,
+    overflow: 'hidden',          // Masque les coins de l'image
+    backgroundColor: '#F5EFE7',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 40,
-    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.08,
+        shadowRadius: 20,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
-  illustrationImage: {
-    width: '85%',
-    height: '85%',
+
+  heroImage: {
+    width: '100%',
+    height: '100%',
   },
-  textContainer: {
+
+  // ─── Zone de contenu textuel ──────────────────────────────────────────────
+  contentArea: {
+    paddingHorizontal: 28,
     alignItems: 'center',
-    paddingHorizontal: 10,
+    paddingTop: 8,
   },
+
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    ...Typography.h1,
+    fontSize: 30,
+    fontWeight: '800',
+    textAlign: 'center',
     color: Colors.text,
-    textAlign: 'center',
-    marginBottom: 15,
+    marginBottom: 14,
+    letterSpacing: -0.4,
   },
-  description: {
-    fontSize: 16,
+
+  subtitle: {
+    ...Typography.body,
+    textAlign: 'center',
     color: Colors.textLight,
-    textAlign: 'center',
     lineHeight: 24,
+    marginBottom: 28,
+    paddingHorizontal: 8,
   },
-  dotContainer: {
+
+  // ─── Indicateurs de pagination ────────────────────────────────────────────
+  paginationRow: {
     flexDirection: 'row',
-    marginTop: 40,
+    alignItems: 'center',
+    gap: 6,
   },
+
   dot: {
-    width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: Colors.border,
-    marginHorizontal: 4,
   },
-  activeDot: {
+
+  // Pilule active allongée — Forest Green
+  dotActive: {
+    width: 28,
     backgroundColor: Colors.primary,
-    width: 20,
   },
+
+  // Points inactifs — cercles gris clair
+  dotInactive: {
+    width: 8,
+    backgroundColor: Colors.border,
+  },
+
+  // ─── Pied de page avec le CTA ─────────────────────────────────────────────
   footer: {
-    paddingBottom: 20,
-  }
+    paddingHorizontal: 24,
+  },
+
+  // Override style du bouton pour le rendre pleinement arrondi (pill shape)
+  ctaButton: {
+    borderRadius: 18,
+    height: 58,
+  },
 });

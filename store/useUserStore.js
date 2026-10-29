@@ -1,15 +1,13 @@
-﻿import { create } from 'zustand';
+import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Génère un identifiant de session unique à chaque démarrage de l'application
-const generateSessionId = () => Date.now().toString() + '-' + Math.random().toString(36).substring(2, 9);
 
 export const useUserStore = create(
   persist(
     (set) => ({
       isAuthenticated: false,
-      sessionId: generateSessionId(),
+      sessionId: null,
 
       userId: null,       
       firstName: null,    
@@ -38,7 +36,7 @@ export const useUserStore = create(
         phone: null,
         ville: null,
         quartier: null,
-        sessionId: generateSessionId(),
+        sessionId: null,
       }),
     }),
     {

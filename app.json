@@ -1,38 +1,53 @@
 {
   "expo": {
     "scheme": "chatandgo",
-    "name": "ChatAndGo",
+    "name": "CoopIA",
     "slug": "ChatAndGo",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/CentralLogo.png",
+    "icon": "./assets/images/Logo_coopIA.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/CentralLogo.png",
+      "image": "./assets/images/Logo_coopIA.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "CoopIA a besoin d'accéder au microphone pour transcrire vos messages vocaux."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/CentralLogo.png",
+        "foregroundImage": "./assets/images/Logo_coopIA.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
       "softwareKeyboardLayoutMode": "pan",
       "package": "com.darelseke.chatandgo",
-      "versionCode": 1
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
-      "favicon": "./assets/images/CentralLogo.png"
+      "favicon": "./assets/images/Logo_coopIA.png"
     },
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "CoopIA a besoin d'accéder à votre caméra pour prendre en photo la plante affectée et la diagnostiquer.",
+          "photosPermission": "CoopIA a besoin d'accéder à votre galerie pour choisir la photo d'une plante à diagnostiquer.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-audio"
     ],
     "extra": {
       "router": {},

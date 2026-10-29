@@ -1,54 +1,129 @@
-import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import Colors from '../../constants/Colors';
-import { GlobalStyles } from '../../constants/Styles';
+﻿/**
+ * CoopIA — CustomButton
+ *
+ * Bouton premium ultra-clean. 3 variantes :
+ *   - "primary"  : Fond Forest Green, texte blanc, ombre colorée
+ *   - "outline"  : Bordure Forest Green, fond transparent, texte vert
+ *   - "ghost"    : Aucune bordure, fond transparent — pour actions secondaires discrètes
+ *
+ * PRINCIPE : Minimum 56px de hauteur, bords arrondis généreux (16px),
+ * aucune marge verticale imposée par défaut — le parent gère l'espacement.
+ */
 
-export default function CustomButton({ 
-  title, 
-  onPress, 
-  variant = 'primary', 
-  loading = false, 
-  style, 
-  textStyle 
+import React from 'react';
+import {
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  View,
+} from 'react-native';
+import Colors from '../../constants/Colors';
+import { Typography, Shadows } from '../../constants/Styles';
+
+export default function CustomButton({
+  title,
+  onPress,
+  variant = 'primary',   // 'primary' | 'outline' | 'ghost'
+  loading = false,
+  disabled = false,
+  style,
+  textStyle,
+  icon,                  // Composant optionnel — icône à gauche du texte
 }) {
   const isPrimary = variant === 'primary';
-  const bgColor = isPrimary ? Colors.primary : Colors.background;
-  const textColor = isPrimary ? Colors.background : Colors.primary;
-  const borderColor = isPrimary ? 'transparent' : Colors.primary;
+  const isOutline = variant === 'outline';
+  // 'ghost' : ni fond, ni bordure
+
+  const containerStyle = [
+    styles.button,
+    isPrimary && styles.buttonPrimary,
+    isOutline && styles.buttonOutline,
+    (disabled || loading) && styles.buttonDisabled,
+    style,
+  ];
+
+  const labelStyle = [
+    styles.text,
+    isPrimary && styles.textPrimary,
+    isOutline && styles.textOutline,
+    !isPrimary && !isOutline && styles.textGhost,
+    textStyle,
+  ];
+
+  const indicatorColor = isPrimary ? Colors.white : Colors.primary;
 
   return (
-    <TouchableOpacity 
-      style={[
-        styles.button, 
-        { backgroundColor: bgColor, borderColor, borderWidth: isPrimary ? 0 : 1 },
-        isPrimary && GlobalStyles.shadow,
-        style
-      ]} 
+    <TouchableOpacity
+      style={containerStyle}
       onPress={onPress}
-      disabled={loading}
-      activeOpacity={0.8}
+      disabled={disabled || loading}
+      activeOpacity={0.82}
     >
       {loading ? (
-        <ActivityIndicator color={textColor} />
+        <ActivityIndicator color={indicatorColor} size="small" />
       ) : (
-        <Text style={[styles.text, { color: textColor }, textStyle]}>{title}</Text>
+        <View style={styles.content}>
+          {icon && <View style={styles.iconWrapper}>{icon}</View>}
+          <Text style={labelStyle}>{title}</Text>
+        </View>
       )}
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
+  // ─── Structure de base ───────────────────────────────────────────────────
   button: {
-    height: 50,
-    borderRadius: 25,
+    height: 56,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    marginVertical: 10,
-    width: '100%',
+    paddingHorizontal: 24,
+    // Aucune marginVertical imposée — le parent gère l'espacement
   },
+
+  // ─── Variante Primary (Forest Green) ─────────────────────────────────────
+  buttonPrimary: {
+    backgroundColor: Colors.primary,
+    ...Shadows.primaryButton,
+  },
+
+  // ─── Variante Outline ─────────────────────────────────────────────────────
+  buttonOutline: {
+    backgroundColor: Colors.transparent,
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+  },
+
+  // ─── État désactivé ───────────────────────────────────────────────────────
+  buttonDisabled: {
+    opacity: 0.45,
+  },
+
+  // ─── Contenu (icône + texte) ──────────────────────────────────────────────
+  content: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  iconWrapper: {
+    // Assure l'alignement vertical parfait de l'icône avec le texte
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // ─── Typographie des variantes ────────────────────────────────────────────
   text: {
-    fontSize: 16,
-    fontWeight: '600',
-  }
+    ...Typography.button,
+  },
+  textPrimary: {
+    color: Colors.white,
+  },
+  textOutline: {
+    color: Colors.primary,
+  },
+  textGhost: {
+    color: Colors.primary,
+  },
 });

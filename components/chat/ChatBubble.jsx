@@ -2,125 +2,94 @@ import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../../constants/Colors';
-import ProviderCard from './ProviderCard';
+import RecommendationCard from './RecommendationCard';
 
-export default function ChatBubble({ message, isUser, userAvatar, userFirstName }) {
-  // Fonction pour parser et afficher le texte en gras
-  const renderFormattedText = (text) => {
-    if (!text) return null;
-    
-    // Separe le texte a chaque fois qu'il trouve des balises **
-    const parts = text.split(/(\**.*?\**)/g);
-    
-    return parts.map((part, index) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
-        // Enleve les ** et applique le style gras
-        return (
-          <Text key={index} style={{ fontWeight: 'bold' }}>
-            {part.slice(2, -2)}
-          </Text>
-        );
-      }
-      return <Text key={index}>{part}</Text>;
-    });
-  };
+// ─── Composant bulle de chat CoopIA ────────────────────────────────────────
+// Remplace l'ancien ChatBubble avec le nouveau style vert/blanc.
+export default function ChatBubble({ msg, initials }) {
+  const isUser = msg.isUser;
+
+  const isImage = msg.text && typeof msg.text === 'string' && msg.text.startsWith('[IMAGE]');
+  const imageUrl = isImage ? msg.text.replace('[IMAGE]', '').trim() : null;
+
+  // Render agricultural recommendations if any
+  const recommendations = (!isUser && Array.isArray(msg.recommendations) && msg.recommendations.length > 0)
+    ? msg.recommendations : [];
 
   return (
     <View style={[styles.msgRow, isUser ? styles.msgRowUser : styles.msgRowAI]}>
-      {/* Avatar IA cote gauche */}
+      {/* Avatar IA (gauche) */}
       {!isUser && (
         <View style={styles.aiAvatar}>
-          <Ionicons name="sparkles" size={16} color={Colors.primary} />
+          <Ionicons name="leaf" size={16} color={Colors.white} />
         </View>
       )}
 
-      <View style={[styles.msgColumn, isUser && { alignItems: 'flex-end' }]}>
+      <View style={[styles.msgCol, isUser && { alignItems: 'flex-end' }]}>
         <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAI]}>
-          <Text style={[styles.bubbleText, isUser ? styles.bubbleTextUser : styles.bubbleTextAI]}>
-            {renderFormattedText(message.text)}
-          </Text>
+          {isImage ? (
+            <View style={{ overflow: 'hidden', borderRadius: 15, marginVertical: 5 }}>
+              <Image 
+                source={{ uri: imageUrl }} 
+                style={{ width: 220, maxWidth: '100%', height: 260, aspectRatio: 0.85 }} 
+                resizeMode="cover" 
+              />
+            </View>
+          ) : isUser ? (
+            <Text style={[styles.bubbleText, styles.bubbleTextUser]}>{msg.text}</Text>
+          ) : (
+            <Text style={[styles.bubbleText, styles.bubbleTextAI]}>
+              {msg.text}
+            </Text>
+          )}
         </View>
 
-        {/* Cartes prestataires si presentes */}
-        {!isUser && message.providers && message.providers.length > 0 && (
-          message.providers.map((provider, index) => (
-            <ProviderCard key={provider.id || index} provider={provider} />
-          ))
-        )}
+        {/* Recommendations display */}
+        {!isUser && recommendations.map((rec, index) => {
+          if (!rec || (typeof rec.titre !== 'string' && typeof rec.description !== 'string')) return null;
+          return (
+            <RecommendationCard 
+              key={`${index}-${rec.titre || ''}`}
+              titre={rec.titre}
+              description={rec.description}
+              is_diagnosis_badge={rec.is_diagnosis_badge}
+            />
+          );
+        })}
 
-        <Text style={styles.timeText}>{message.time}</Text>
+        {/* Horodatage */}
+        <View style={styles.timeRow}>
+          <Text style={styles.timeText}>{msg.time}</Text>
+          {isUser && (
+            <Ionicons name="checkmark" size={11} color={Colors.textMuted} style={{ marginLeft: 2 }} />
+          )}
+        </View>
       </View>
-
-      {/* Avatar utilisateur cote droit */}
-      {isUser && (
-        userAvatar
-          ? <Image source={{ uri: userAvatar }} style={styles.userAvatar} />
-          : (
-            <View style={[styles.userAvatar, styles.userAvatarFallback]}>
-              <Text style={styles.userAvatarInitial}>{(userFirstName || 'U').charAt(0)}</Text>
-            </View>
-          )
-      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  msgRow: {
-    flexDirection: 'row',
-    marginBottom: 18,
-    alignItems: 'flex-end',
-    gap: 8,
-  },
-  msgRowUser: {
-    justifyContent: 'flex-end',
-  },
-  msgRowAI: {
-    justifyContent: 'flex-start',
-  },
-  msgColumn: {
-    maxWidth: '85%', // Un peu plus large pour les cartes
-  },
+  // Ligne de message
+  msgRow: { flexDirection: 'row', marginBottom: 18, alignItems: 'flex-end', gap: 8 },
+  msgRowUser: { justifyContent: 'flex-end' },
+  msgRowAI:   { justifyContent: 'flex-start' },
+  msgCol: { maxWidth: '82%' },
+
+  // Avatar IA
   aiAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 11,
-    backgroundColor: `${Colors.primary}18`,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
-  },
-  userAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    flexShrink: 0,
-    borderWidth: 2,
-    borderColor: Colors.primary,
-  },
-  userAvatarFallback: {
+    width: 34, height: 34, borderRadius: 12,
     backgroundColor: Colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'center', alignItems: 'center', flexShrink: 0,
   },
-  userAvatarInitial: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  bubble: {
-    paddingHorizontal: 15,
-    paddingVertical: 11,
-    borderRadius: 20,
-  },
+
+  // Bulles
+  bubble: { paddingHorizontal: 15, paddingVertical: 11, borderRadius: 20 },
   bubbleUser: {
     backgroundColor: Colors.primary,
     borderBottomRightRadius: 5,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 5,
-    elevation: 3,
+    elevation: 3, // simplified platform select for web/android
+    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 6,
   },
   bubbleAI: {
     backgroundColor: Colors.background,
@@ -128,20 +97,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  bubbleText: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  bubbleTextUser: {
-    color: '#fff',
-  },
-  bubbleTextAI: {
-    color: Colors.text,
-  },
-  timeText: {
-    fontSize: 10,
-    color: Colors.textLight,
-    marginTop: 5,
-    marginHorizontal: 4,
-  },
+  bubbleText: { fontSize: 15, lineHeight: 22 },
+  bubbleTextUser: { color: Colors.white },
+  bubbleTextAI:   { color: Colors.text },
+
+  // Horodatage
+  timeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 5, marginHorizontal: 4 },
+  timeText: { fontSize: 10, color: Colors.textMuted },
 });

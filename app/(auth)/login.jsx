@@ -1,271 +1,279 @@
-﻿import React, { useState, useRef } from 'react';
+/**
+ * CoopIA — Login Screen (auth/login.jsx)
+ *
+ * Écran de connexion avec saisie du numéro de téléphone ivoirien (+225).
+ * L'identifiant envoyé au backend reste sous forme normalisée (phone comme email-équivalent).
+ * Aucun changement côté authService — mapping UI → payload géré ici.
+ */
+
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
   ScrollView,
-  Platform,
-  Animated,
+  TouchableOpacity,
   Alert,
+  Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Colors from '../../constants/Colors';
+import { useRouter } from 'expo-router';
+import ScreenWrapper from '../../components/layout/ScreenWrapper';
 import CustomButton from '../../components/ui/CustomButton';
-import { authService } from '../../services/authService';
+import PhoneInput from '../../components/ui/PhoneInput';
+import Colors from '../../constants/Colors';
+import { Typography } from '../../constants/Styles';
+import { BASE_URL } from '../../constants/api';
+import { useUserStore } from '../../store/useUserStore';
 
-// Couleur primaire du bouton e-mail (hérite de Colors.primary)
+// Numéro valide = au moins 8 chiffres
+const isValidPhone = (n) => n.replace(/\D/g, '').length >= 8;
+
+// Normalise le numéro au format E.164
+const normalizePhone = (input) => {
+  let cleaned = input.replace(/[\s\-()]/g, '');
+  if (cleaned.startsWith('00')) {
+    cleaned = '+' + cleaned.slice(2);
+  }
+  if (!cleaned.startsWith('+')) {
+    if (cleaned.startsWith('0')) {
+      cleaned = cleaned.slice(1);
+    }
+    cleaned = '+225' + cleaned;
+  }
+  return cleaned;
+};
+
+// Formate le numéro pour l'affichage (masque partiel dans le sous-titre de l'OTP)
+export const formatPhoneForDisplay = (n) =>
+  n.length >= 4 ? `+225 ${n.slice(0, 2)} ${n.slice(2, 4)} ••••` : `+225 ${n}`;
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('');
-  const [isFocused, setIsFocused] = useState(false);
+  const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const inputRef = useRef(null);
-
-  // Validation simple : l'adresse doit contenir "@" et au moins un "."
-  const isValid = email.includes('@') && email.includes('.');
+  const { setUserData } = useUserStore();
 
   const handleContinue = async () => {
-    if (!isValid) return;
+    if (loading) return;
+    
+    if (!isValidPhone(phone)) {
+      Alert.alert('Numéro invalide', 'Veuillez entrer un numéro valide.');
+      return;
+    }
+
+    const normalizedPhone = normalizePhone(phone);
+    
+    // Validation stricte E.164 backend ^\+[1-9]\d{7,14}$
+    if (!/^\+[1-9]\d{7,14}$/.test(normalizedPhone)) {
+      Alert.alert('Numéro invalide', 'Le format du numéro est incorrect.');
+      return;
+    }
+
     setLoading(true);
+
     try {
-      await authService.requestOtp(email.trim().toLowerCase());
-      // Transmet l'e-mail en paramètre de navigation vers l'écran de vérification
-      router.push({ pathname: '/(auth)/verify-otp', params: { email: email.trim().toLowerCase() } });
+      const response = await fetch(`${BASE_URL}/auth/request-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone_number: normalizedPhone })
+      });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        let errorMsg = "Impossible d'envoyer le code.";
+        if (data && data.detail) {
+          errorMsg = Array.isArray(data.detail) ? data.detail[0].msg : data.detail;
+        }
+        Alert.alert('Erreur', errorMsg);
+        return;
+      }
+
+      setUserData({ phone: normalizedPhone }); // Sauvegarde temporaire
+      router.push({
+        pathname: '/(auth)/verify-otp',
+        params: { phone_number: normalizedPhone, auto_code: data.code },
+      });
     } catch (error) {
-      if (__DEV__) { console.error(error); }
-      Alert.alert('Erreur', error.message || "Impossible d'envoyer le code. Réessayez.");
+      Alert.alert('Erreur de connexion', "Erreur de connexion au serveur.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.root, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-    >
+    <ScreenWrapper withKeyboard noPadding backgroundColor={Colors.background}>
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* â”€â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-        <View style={styles.header}>
-          <View style={styles.iconContainer}>
-            <Ionicons name="chatbubble-ellipses" size={36} color="#fff" />
+        {/* ─── En-tête Logo CoopIA ─────────────────────────────────────── */}
+        <View style={styles.logoSection}>
+          <View style={styles.logoBox}>
+            <Ionicons name="leaf" size={28} color={Colors.white} />
           </View>
-          <Text style={styles.appName}>Chat<Text style={styles.appNameAccent}>&</Text>Go</Text>
-          <Text style={styles.tagline}>COMMERCE · FLUIDITÉ</Text>
+          <Text style={styles.logoTitle}>
+            <Text style={styles.logoTitleDark}>Coop</Text>
+            <Text style={styles.logoTitleGreen}>IA</Text>
+          </Text>
+          <Text style={styles.logoTagline}>L'INTELLIGENCE AGRICOLE</Text>
         </View>
 
-        {/* â”€â”€â”€ Carte formulaire â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-        <View style={styles.card}>
-          <Text style={styles.title}>Connexion</Text>
+        {/* ─── Titre & Sous-titre ───────────────────────────────────────── */}
+        <View style={styles.headerSection}>
+          <Text style={styles.title}>Connexion Planteur</Text>
           <Text style={styles.subtitle}>
-            Entrez votre adresse e-mail pour recevoir votre code de vérification.
+            Entrez votre numéro de téléphone pour recevoir votre code d'accès sécurisé.
           </Text>
+        </View>
 
-          {/* Champ de saisie de l'e-mail */}
-          <TouchableOpacity
-            style={[styles.inputWrapper, isFocused && styles.inputWrapperFocused]}
-            activeOpacity={1}
-            onPress={() => inputRef.current?.focus()}
-          >
-            {/* Icône e-mail */}
-            <Ionicons
-              name="mail-outline"
-              size={20}
-              color={isFocused ? Colors.primary : Colors.textLight}
-              style={styles.emailIcon}
-            />
+        {/* ─── Formulaire ───────────────────────────────────────────────── */}
+        <View style={styles.formSection}>
+          <PhoneInput
+            label="Numéro mobile"
+            value={phone}
+            onChangeText={setPhone}
+          />
 
-            <TextInput
-              ref={inputRef}
-              style={styles.input}
-              placeholder="nom@exemple.com"
-              placeholderTextColor={Colors.textLight}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              value={email}
-              onChangeText={setEmail}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
-              returnKeyType="done"
-              onSubmitEditing={handleContinue}
-            />
+          {/* Badge de sécurité */}
+          <View style={styles.securityBadge}>
+            <Ionicons name="lock-closed-outline" size={13} color={Colors.primary} />
+            <Text style={styles.securityText}>
+              Vos données agricoles sont sécurisées et chiffrées
+            </Text>
+          </View>
 
-            {/* Icône de validation si l'e-mail est valide */}
-            {isValid && (
-              <Ionicons name="checkmark-circle" size={22} color={Colors.success} style={styles.checkIcon} />
-            )}
-          </TouchableOpacity>
-
-          <Text style={styles.hint}>
-            <Ionicons name="lock-closed-outline" size={11} /> Vos données sont sécurisées et ne seront jamais partagées.
-          </Text>
-
-          {/* Bouton Continuer */}
+          {/* CTA */}
           <CustomButton
             title="Continuer"
             onPress={handleContinue}
             loading={loading}
-            style={[styles.continueBtn, !isValid && styles.continueBtnDisabled]}
+            disabled={!isValidPhone(phone) || loading}
+            style={styles.ctaButton}
           />
         </View>
-
-        {/* â”€â”€â”€ Conditions d'utilisation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-        <Text style={[styles.terms, { paddingBottom: insets.bottom + 24 }]}>
-          En continuant, vous acceptez nos{' '}
-          <Text style={styles.termsLink}>Conditions d'utilisation</Text>
-          {' '}et notre{' '}
-          <Text style={styles.termsLink}>Politique de confidentialité</Text>.
-        </Text>
       </ScrollView>
-    </KeyboardAvoidingView>
+
+      {/* ─── Pied de page légal épinglé en bas ───────────────────────── */}
+      <View style={styles.footer}>
+        <Text style={styles.legalText}>
+          En continuant, vous acceptez nos{' '}
+          <Text style={styles.legalLink}>Conditions d'utilisation</Text>
+          {' '}et notre{' '}
+          <Text style={styles.legalLink}>Politique de confidentialité</Text>.
+        </Text>
+      </View>
+    </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: Colors.primary,
-  },
   scroll: {
     flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 16,
   },
 
-  // â”€â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  header: {
+  // ─── Logo section ─────────────────────────────────────────────────────────
+  logoSection: {
     alignItems: 'center',
-    paddingTop: 32,
-    paddingBottom: 36,
+    marginBottom: 40,
   },
-  iconContainer: {
-    width: 68,
-    height: 68,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 20,
+  logoBox: {
+    width: 60,
+    height: 60,
+    borderRadius: 16,
+    backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 14,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.35)',
+    marginBottom: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: Colors.primary,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.28,
+        shadowRadius: 12,
+      },
+      android: { elevation: 6 },
+    }),
   },
-  appName: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-    letterSpacing: 0.5,
+  logoTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 4,
+    letterSpacing: -0.3,
   },
-  appNameAccent: {
-    color: 'rgba(255,255,255,0.7)',
-  },
-  tagline: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.6)',
+  logoTitleDark: { color: Colors.text },
+  logoTitleGreen: { color: Colors.primary },
+  logoTagline: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: Colors.primary,
     letterSpacing: 3,
-    marginTop: 4,
+    textTransform: 'uppercase',
   },
 
-  // â”€â”€â”€ Carte formulaire â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  card: {
-    flex: 1,
-    backgroundColor: Colors.background,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    paddingHorizontal: 24,
-    paddingTop: 32,
-    paddingBottom: 8,
-    // Ombre douce vers le haut
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 8,
+  // ─── Header textuel ───────────────────────────────────────────────────────
+  headerSection: {
+    alignItems: 'center',
+    marginBottom: 36,
   },
   title: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    color: Colors.text,
-    marginBottom: 8,
+    ...Typography.h1,
+    fontSize: 28,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 12,
+    letterSpacing: -0.3,
   },
   subtitle: {
-    fontSize: 14,
+    ...Typography.body,
+    textAlign: 'center',
     color: Colors.textLight,
-    lineHeight: 21,
-    marginBottom: 28,
+    lineHeight: 23,
+    paddingHorizontal: 8,
   },
 
-  // â”€â”€â”€ Champ de saisie e-mail â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  inputWrapper: {
+  // ─── Formulaire ───────────────────────────────────────────────────────────
+  formSection: {
+    flex: 1,
+  },
+  securityBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    borderRadius: 14,
-    backgroundColor: Colors.gray,
-    height: 58,
-    paddingHorizontal: 14,
-    marginBottom: 10,
+    gap: 6,
+    marginTop: 10,
+    marginBottom: 28,
+    marginLeft: 2,
   },
-  inputWrapperFocused: {
-    borderColor: Colors.primary,
-    backgroundColor: '#fff',
-    // Halo de focus
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  emailIcon: {
-    marginRight: 10,
-  },
-  input: {
+  securityText: {
+    ...Typography.caption,
+    color: Colors.textLight,
+    fontSize: 12,
     flex: 1,
-    fontSize: 16,
-    color: Colors.text,
   },
-  checkIcon: {
-    marginLeft: 6,
-  },
-  hint: {
-    fontSize: 11,
-    color: Colors.textLight,
-    marginBottom: 24,
-    lineHeight: 17,
+  ctaButton: {
+    borderRadius: 18,
+    height: 58,
   },
 
-  // â”€â”€â”€ Bouton principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  continueBtn: {
-    marginBottom: 24,
+  // ─── Footer légal ─────────────────────────────────────────────────────────
+  footer: {
+    paddingHorizontal: 28,
+    paddingBottom: 24,
+    paddingTop: 12,
   },
-  continueBtnDisabled: {
-    opacity: 0.5,
-  },
-
-  // â”€â”€â”€ CGU â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  terms: {
+  legalText: {
+    ...Typography.caption,
     textAlign: 'center',
-    fontSize: 11,
-    color: Colors.textLight,
-    paddingHorizontal: 30,
-    paddingTop: 16,
     lineHeight: 18,
-    backgroundColor: Colors.background,
+    color: Colors.textLight,
   },
-  termsLink: {
-    color: Colors.primary,
+  legalLink: {
+    color: Colors.text,
+    textDecorationLine: 'underline',
     fontWeight: '500',
   },
 });
-

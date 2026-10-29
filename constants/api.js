@@ -1,4 +1,3 @@
 ﻿// constants/api.js
-// URL gérée via les variables d'environnement Expo (.env à la racine du projet React Native)
-// Fallback sur localhost pour le dev si non défini
-export const BASE_URL = 'https://chatgo-backend-ci.onrender.com/api/v1';
+// URL from Expo env variables, with local network fallback
+export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.97:8000/api/v1';
