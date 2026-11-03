@@ -15,6 +15,7 @@ import {
   Animated,
   Platform,
 } from 'react-native';
+import { Asset } from 'expo-asset';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import ScreenWrapper from '../../components/layout/ScreenWrapper';
@@ -36,6 +37,9 @@ export default function SplashScreen() {
   const slideAnim = useRef(new Animated.Value(18)).current;
 
   useEffect(() => {
+    // Pré-chargement asynchrone anticipé de l'image Onboarding pendant l'animation Splash
+    Asset.fromModule(require('../../assets/images/onboarding_hero.jpg')).downloadAsync();
+
     // Entrée : fade + slide du logo
     Animated.parallel([
       Animated.timing(fadeAnim, {

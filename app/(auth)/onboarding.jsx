@@ -6,7 +6,7 @@
  * sous-titre, indicateurs de pagination, puis bouton CTA "Commencer" épinglé en bas.
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
+import { Asset } from 'expo-asset';
 import { useRouter } from 'expo-router';
 import ScreenWrapper from '../../components/layout/ScreenWrapper';
 import CustomButton from '../../components/ui/CustomButton';
@@ -26,6 +27,11 @@ const HERO_IMAGE = require('../../assets/images/onboarding_hero.jpg');
 export default function OnboardingScreen() {
   const router = useRouter();
 
+  // Pré-chargement immédiat de l'image en mémoire pour un affichage instantané sans latence
+  useEffect(() => {
+    Asset.fromModule(HERO_IMAGE).downloadAsync();
+  }, []);
+
   const handleStart = () => {
     router.replace('/(auth)/login');
   };
@@ -34,33 +40,32 @@ export default function OnboardingScreen() {
     <ScreenWrapper noPadding backgroundColor={Colors.background}>
       <View style={styles.root}>
 
-        {/* ─── Zone supérieure : Image Hero ─────────────────────────────── */}
-        <View style={styles.heroContainer}>
-          <Image
-            source={HERO_IMAGE}
-            style={styles.heroImage}
-            resizeMode="cover"
-          />
-        </View>
+        {/* ─── Zone principale : Image Hero descendue et rapprochée du texte ─ */}
+        <View style={styles.mainContent}>
+          <View style={styles.heroContainer}>
+            <Image
+              source={HERO_IMAGE}
+              style={styles.heroImage}
+              resizeMode="cover"
+              fadeDuration={0}
+            />
+          </View>
 
-        {/* ─── Zone centrale : Titre + Sous-titre + Pagination ──────────── */}
-        <View style={styles.contentArea}>
-          {/* Titre principal */}
-          <Text style={styles.title}>Cultivez avec l'IA</Text>
+          <View style={styles.contentArea}>
+            {/* Titre principal */}
+            <Text style={styles.title}>Cultivez avec l'IA</Text>
 
-          {/* Sous-titre */}
-          <Text style={styles.subtitle}>
-            Prenez en photo vos cultures, déclarez vos récoltes et recevez des
-            conseils d'experts instantanément.
-          </Text>
+            {/* Sous-titre */}
+            <Text style={styles.subtitle}>
+              Prenez en photo vos cultures, déclarez vos récoltes et recevez des
+              conseils d'experts instantanément.
+            </Text>
 
-          {/* Indicateurs de pagination */}
-          <View style={styles.paginationRow}>
-            {/* Indicateur actif — pilule allongée Forest Green */}
-            <View style={[styles.dot, styles.dotActive]} />
-            {/* Indicateurs inactifs — petits cercles gris clair */}
-            <View style={[styles.dot, styles.dotInactive]} />
-            <View style={[styles.dot, styles.dotInactive]} />
+            {/* Indicateurs de pagination */}
+            <View style={styles.paginationRow}>
+              {/* Indicateur actif — pilule allongée Forest Green */}
+              <View style={[styles.dot, styles.dotActive]} />
+            </View>
           </View>
         </View>
 
@@ -88,15 +93,22 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
 
+  // ─── Zone principale regroupée ───────────────────────────────────────────
+  mainContent: {
+    width: '100%',
+    alignItems: 'center',
+  },
+
   // ─── Conteneur image hero ──────────────────────────────────────────────────
-  // Le conteneur a des marges et coins arrondis — l'image ne saigne pas sur les bords
+  // Image descendue et harmonieusement rapprochée du titre
   heroContainer: {
     alignSelf: 'center',
     width: '90%',
     maxWidth: 340,
     aspectRatio: 1,
     maxHeight: 310,
-    marginTop: 16,
+    marginTop: 32,
+    marginBottom: 20,
     borderRadius: 36,
     overflow: 'hidden',          // Masque les coins de l'image
     backgroundColor: '#F5EFE7',
