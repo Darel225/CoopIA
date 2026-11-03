@@ -32,24 +32,36 @@ export const chatService = {
     return await response.json();
   },
 
-  async sendMessage(text, sessionId, token) {
-    const response = await fetch(`${BASE_URL}/chat/message`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        text: text,
-        session_id: sessionId || null
-      })
-    });
+  async sendMessage(text, sessionId, token, retryCount = 1) {
+    try {
+      const response = await fetch(`${BASE_URL}/chat/message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          text: text,
+          session_id: sessionId || null
+        })
+      });
 
-    if (!response.ok) {
-      const errorMsg = await _extractErrorMessage(response);
-      throw new Error(errorMsg);
+      if (!response.ok) {
+        if (response.status >= 500 && retryCount > 0) {
+          await new Promise(r => setTimeout(r, 1200));
+          return await this.sendMessage(text, sessionId, token, retryCount - 1);
+        }
+        const errorMsg = await _extractErrorMessage(response);
+        throw new Error(errorMsg);
+      }
+      return await response.json();
+    } catch (err) {
+      if (retryCount > 0 && !(err.message && err.message.includes('401'))) {
+        await new Promise(r => setTimeout(r, 1200));
+        return await this.sendMessage(text, sessionId, token, retryCount - 1);
+      }
+      throw err;
     }
-    return await response.json();
   },
 
   async sendDiagnosisImage(imageUri, mimeType, fileName, sessionId, token) {
