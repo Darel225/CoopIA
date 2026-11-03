@@ -5,14 +5,8 @@
     "slug": "ChatAndGo",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/Logo_coopIA.png",
+    "icon": "./assets/images/Logo_coopIA_square.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/images/Logo_coopIA.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
@@ -21,12 +15,11 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/Logo_coopIA.png",
+        "foregroundImage": "./assets/images/Logo_coopIA_square.png",
         "backgroundColor": "#ffffff"
       },
       "softwareKeyboardLayoutMode": "pan",
       "package": "com.darelseke.chatandgo",
-      "versionCode": 1,
       "permissions": [
         "android.permission.RECORD_AUDIO"
       ]
@@ -47,7 +40,8 @@
           "microphonePermission": false
         }
       ],
-      "expo-audio"
+      "expo-audio",
+      "expo-splash-screen"
     ],
     "extra": {
       "router": {},
