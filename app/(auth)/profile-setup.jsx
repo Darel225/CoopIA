@@ -185,15 +185,17 @@ export default function ProfileSetupScreen() {
           const safeName = avatar.split('/').pop() || 'avatar.jpg';
           const formData = new FormData();
 
-          try {
-            // Conversion URI -> Blob (obligatoire pour React Native / Expo 51+ / Hermes)
-            const localFileResponse = await fetch(avatar);
-            const originalBlob = await localFileResponse.blob();
-            const blob = new Blob([originalBlob], { type: 'image/jpeg' });
-            formData.append('file', blob, safeName);
-          } catch (blobErr) {
+          if (Platform.OS === 'web') {
+            try {
+              const localFileResponse = await fetch(avatar);
+              const originalBlob = await localFileResponse.blob();
+              formData.append('file', originalBlob, safeName);
+            } catch (blobErr) {
+              formData.append('file', { uri: avatar, name: safeName, type: 'image/jpeg' });
+            }
+          } else {
             formData.append('file', {
-              uri: Platform.OS === 'ios' ? avatar.replace('file://', '') : avatar,
+              uri: avatar,
               name: safeName,
               type: 'image/jpeg',
             });

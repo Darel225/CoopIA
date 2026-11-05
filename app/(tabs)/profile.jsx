@@ -259,14 +259,24 @@ export default function ProfileScreen() {
 
       if (token) {
         try {
-          // Conversion URI -> Blob (obligatoire pour Expo 51+ / Hermes)
-          const localFileResponse = await fetch(localUri);
-          const originalBlob = await localFileResponse.blob();
           const safeName = localUri.split('/').pop() || 'avatar.jpg';
-          const blob = new Blob([originalBlob], { type: 'image/jpeg' });
-
           const formData = new FormData();
-          formData.append('file', blob, safeName);
+
+          if (Platform.OS === 'web') {
+            try {
+              const localFileResponse = await fetch(localUri);
+              const originalBlob = await localFileResponse.blob();
+              formData.append('file', originalBlob, safeName);
+            } catch (err) {
+              formData.append('file', { uri: localUri, name: safeName, type: 'image/jpeg' });
+            }
+          } else {
+            formData.append('file', {
+              uri: localUri,
+              name: safeName,
+              type: 'image/jpeg',
+            });
+          }
 
           const uploadRes = await fetch(`${BASE_URL}/profile/avatar`, {
             method: 'POST',

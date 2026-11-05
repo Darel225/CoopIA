@@ -79,13 +79,26 @@ export const chatService = {
       }
     }
 
-    // Fetch the file URI to convert it into a Blob (required by Expo 51+ modern fetch)
-    const localFileResponse = await fetch(imageUri);
-    const originalBlob = await localFileResponse.blob();
-    const blob = new Blob([originalBlob], { type: safeType });
-
     const formData = new FormData();
-    formData.append('file', blob, safeName);
+
+    // Compatibilité Android APK natif & Web :
+    // Sur Android React Native, fetch(file://) lève Network request failed.
+    // L'objet multipart natif { uri, name, type } est requis sur Android/iOS.
+    if (Platform.OS === 'web') {
+      try {
+        const localFileResponse = await fetch(imageUri);
+        const originalBlob = await localFileResponse.blob();
+        formData.append('file', originalBlob, safeName);
+      } catch (blobErr) {
+        formData.append('file', { uri: imageUri, name: safeName, type: safeType });
+      }
+    } else {
+      formData.append('file', {
+        uri: imageUri,
+        name: safeName,
+        type: safeType,
+      });
+    }
 
     if (sessionId) {
       formData.append('session_id', String(sessionId));
