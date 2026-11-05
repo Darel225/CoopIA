@@ -19,6 +19,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -149,9 +150,17 @@ export default function HistoryScreen() {
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         {/* Ligne avatar + titre */}
         <View style={styles.headerTop}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>{initials}</Text>
-          </View>
+          <TouchableOpacity
+            style={styles.avatarCircle}
+            onPress={() => router.push('/(tabs)/profile')}
+            activeOpacity={0.8}
+          >
+            {avatar ? (
+              <Image source={{ uri: avatar }} style={styles.avatarImage} />
+            ) : (
+              <Text style={styles.avatarText}>{initials}</Text>
+            )}
+          </TouchableOpacity>
           <View style={styles.headerTitles}>
             <Text style={styles.headerTitle}>Historique 👋</Text>
             <Text style={styles.headerSubtitle}>Retrouvez vos diagnostics et récoltes</Text>
@@ -262,6 +271,12 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.40)',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 23,
   },
   avatarText: { fontSize: 18, fontWeight: '800', color: Colors.white },
   headerTitles: { flex: 1 },
