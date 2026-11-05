@@ -18,7 +18,7 @@
         "foregroundImage": "./assets/images/Logo_coopIA_square.png",
         "backgroundColor": "#ffffff"
       },
-      "softwareKeyboardLayoutMode": "pan",
+      "softwareKeyboardLayoutMode": "resize",
       "package": "com.darelseke.chatandgo",
       "permissions": [
         "android.permission.RECORD_AUDIO"

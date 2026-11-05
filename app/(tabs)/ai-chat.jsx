@@ -19,6 +19,7 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -65,7 +66,7 @@ function isValidUuid(id) {
 // ─── Écran principal ────────────────────────────────────────────────────────
 export default function AiChatScreen() {
   const { avatar, firstName, prenom, sessionId: storeSessionId, setUserData } = useUserStore();
-  const { prefill, sessionId: historySessionId, titre } = useLocalSearchParams();
+  const { prefill, sessionId: historySessionId, titre, action } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const listRef = useRef(null);
   const router = useRouter();
@@ -85,6 +86,20 @@ export default function AiChatScreen() {
     const validS = (storeSessionId && isValidUuid(storeSessionId)) ? storeSessionId : null;
     setActiveSessionId(validH || validS || null);
   }, [historySessionId, storeSessionId]);
+
+  // Si déclenché via l'action rapide "Signaler une maladie", ouvrir directement le sélecteur photo
+  useEffect(() => {
+    if (action === 'diagnose') {
+      setSheetOpen(true);
+    }
+  }, [action]);
+
+  // Si un texte de pré-remplissage est fourni (ex: déclaration de récolte)
+  useEffect(() => {
+    if (prefill) {
+      setMessage(prefill);
+    }
+  }, [prefill]);
 
 
   const [message,        setMessage]        = useState(prefill || '');
@@ -426,10 +441,18 @@ export default function AiChatScreen() {
             </View>
           </View>
         </View>
-        {/* Avatar utilisateur avec initiales */}
-        <View style={styles.userAvatar}>
-          <Text style={styles.userInitials}>{initials}</Text>
-        </View>
+        {/* Avatar utilisateur avec photo ou initiales */}
+        <TouchableOpacity
+          style={styles.userAvatar}
+          onPress={() => router.push('/(tabs)/profile')}
+          activeOpacity={0.8}
+        >
+          {avatar ? (
+            <Image source={{ uri: avatar }} style={styles.userAvatarImage} />
+          ) : (
+            <Text style={styles.userInitials}>{initials}</Text>
+          )}
+        </TouchableOpacity>
       </View>
 
       {/* ── Liste des messages ────────────────────────────────────── */}
@@ -606,6 +629,11 @@ const styles = StyleSheet.create({
   onlineRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
   onlineDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.success },
   onlineText: { fontSize: 11, color: Colors.textLight },
+  userAvatarImage: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+  },
   userAvatar: {
     width: 38,
     height: 38,

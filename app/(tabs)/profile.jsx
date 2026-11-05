@@ -21,6 +21,9 @@ import {
   TouchableOpacity,
   Linking,
   ActivityIndicator,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -30,6 +33,7 @@ import * as ImagePicker from 'expo-image-picker';
 import Colors from '../../constants/Colors';
 import { useUserStore } from '../../store/useUserStore';
 import SettingsRow from '../../components/ui/SettingsRow';
+import CropSelectorGrid from '../../components/ui/CropSelectorGrid';
 
 // ─── Titre de section ────────────────────────────────────────────────────────
 const SectionTitle = ({ label }) => (
@@ -113,16 +117,105 @@ export default function ProfileScreen() {
   const formatPhone = (val) => {
     if (!val) return '—';
     const digits = val.replace(/\D/g, '');
-    const local = digits.startsWith('225') ? digits.slice(3) : digits;
-    if (local.length >= 8) {
-      return `+225 ${local.replace(/(\d{2})(?=\d)/g, '$1 ')}`;
+    let local = digits.startsWith('225') ? digits.slice(3) : digits;
+    // Si le numéro a 9 chiffres suite à un ancien découpage erroné, restaurer le 0 opérateur (ex: 07...)
+    if (local.length === 9 && !local.startsWith('0')) {
+      local = '0' + local;
+    }
+    // Format officiel ivoirien à 10 chiffres (+225 XX XX XX XX XX)
+    if (local.length === 10) {
+      return `+225 ${local.slice(0, 2)} ${local.slice(2, 4)} ${local.slice(4, 6)} ${local.slice(6, 8)} ${local.slice(8, 10)}`;
     }
     return val.startsWith('+') ? val : `+225 ${val}`;
   };
   const phoneDisplay = formatPhone(rawPhone);
   const cropDisplay = crops && crops.length > 0
-    ? crops[0].charAt(0).toUpperCase() + crops[0].slice(1) + ' (Fèves Ivoiriennes)'
-    : 'Cacao (Fèves Ivoiriennes)';
+    ? crops[0].charAt(0).toUpperCase() + crops[0].slice(1) + ' (Filière Officielle)'
+    : 'Cacao (Filière Officielle)';
+
+  // ─── Modification du profil ────────────────────────────────────────────────
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editFullName, setEditFullName] = useState('');
+  const [editVillage, setEditVillage] = useState('');
+  const [editCrop, setEditCrop] = useState('cacao');
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  const handleOpenEditModal = () => {
+    setEditFullName(displayName !== 'Planteur' ? displayName : '');
+    setEditVillage(quartier || zone || '');
+    setEditCrop(crops && crops.length > 0 ? crops[0] : 'cacao');
+    setEditModalVisible(true);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!editFullName.trim()) {
+      Alert.alert('Nom requis', 'Veuillez saisir votre nom complet.');
+      return;
+    }
+    if (!editVillage.trim()) {
+      Alert.alert('Village requis', 'Veuillez préciser votre village ou localité.');
+      return;
+    }
+
+    setSavingProfile(true);
+    try {
+      let token = null;
+      if (Platform.OS !== 'web') {
+        token = await SecureStore.getItemAsync('userToken');
+      } else {
+        token = localStorage.getItem('userToken');
+      }
+
+      if (!token) {
+        Alert.alert('Session expirée', 'Veuillez vous reconnecter.');
+        return;
+      }
+
+      const parts = editFullName.trim().split(' ');
+      const pName = parts[0];
+      const lName = parts.slice(1).join(' ');
+
+      const response = await fetch(`${BASE_URL}/profile/update-profile`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          first_name: pName,
+          last_name: lName,
+          nom: lName,
+          prenom: pName,
+          village: editVillage.trim(),
+          culture: editCrop,
+          culture_principale: editCrop,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const updatedUser = data?.user || {};
+        setUserData({
+          firstName: updatedUser.first_name || pName,
+          prenom: updatedUser.first_name || pName,
+          nom: updatedUser.last_name || lName,
+          zone: updatedUser.village || editVillage.trim(),
+          quartier: updatedUser.village || editVillage.trim(),
+          crops: [updatedUser.culture || editCrop],
+        });
+        setEditModalVisible(false);
+        Alert.alert('✅ Profil mis à jour', 'Vos informations ont été enregistrées avec succès.');
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        Alert.alert('Erreur', errData.detail || 'Impossible de mettre à jour votre profil.');
+      }
+    } catch (e) {
+      if (__DEV__) console.log('[handleSaveProfile error]', e);
+      Alert.alert('Erreur', 'Erreur de connexion lors de la mise à jour du profil.');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
 
   // ─── Changer la photo de profil (Avatar) ───────────────────────────────────
   const handlePickAvatar = async () => {
@@ -384,6 +477,14 @@ export default function ProfileScreen() {
               iconColor={Colors.primary}
               subtitle="Culture Principale"
               title={cropDisplay}
+            />
+            <SettingsRow
+              icon="create-outline"
+              iconBgColor={Colors.primaryLight}
+              iconColor={Colors.primary}
+              title="Modifier mes informations"
+              subtitle="Nom, village et culture principale"
+              onPress={handleOpenEditModal}
               hideDivider
             />
           </SettingsCard>
@@ -427,6 +528,81 @@ export default function ProfileScreen() {
 
         </ScrollView>
       </View>
+      {/* ════ MODALE MODIFICATION DU PROFIL ══════════════════════════════════ */}
+      <Modal
+        visible={editModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalContent}>
+            {/* Barre de titre */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Modifier mon profil</Text>
+              <TouchableOpacity
+                onPress={() => setEditModalVisible(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close-circle" size={26} color={Colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
+              {/* Champ Nom Complet */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>NOM COMPLET</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={editFullName}
+                  onChangeText={setEditFullName}
+                  placeholder="Ex: Estelle Kouame"
+                  placeholderTextColor={Colors.textMuted}
+                />
+              </View>
+
+              {/* Champ Village / Localité */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>VILLAGE OU LOCALITÉ</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={editVillage}
+                  onChangeText={setEditVillage}
+                  placeholder="Ex: Pindikro"
+                  placeholderTextColor={Colors.textMuted}
+                />
+              </View>
+
+              {/* Sélecteur de Culture */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>CULTURE PRINCIPALE (FILIÈRES CAPED)</Text>
+                <CropSelectorGrid
+                  selected={[editCrop]}
+                  onToggle={(cropId) => setEditCrop(cropId)}
+                  multiSelect={false}
+                />
+              </View>
+
+              {/* Bouton de sauvegarde */}
+              <TouchableOpacity
+                style={[styles.saveBtn, savingProfile && styles.saveBtnDisabled]}
+                onPress={handleSaveProfile}
+                disabled={savingProfile}
+                activeOpacity={0.8}
+              >
+                {savingProfile ? (
+                  <ActivityIndicator color={Colors.white} />
+                ) : (
+                  <Text style={styles.saveBtnText}>Enregistrer les modifications</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -580,5 +756,73 @@ const styles = StyleSheet.create({
       },
       android: { elevation: 1 },
     }),
+  },
+  // ─── Modale d'édition de profil ───────────────────────────────────────────
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 32,
+    maxHeight: '85%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: Colors.text,
+  },
+  modalScroll: {
+    paddingBottom: 20,
+  },
+  inputGroup: {
+    marginBottom: 18,
+  },
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.textMuted,
+    letterSpacing: 1.1,
+    marginBottom: 8,
+  },
+  textInput: {
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: Colors.text,
+    fontWeight: '500',
+  },
+  saveBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  saveBtnDisabled: {
+    opacity: 0.6,
+  },
+  saveBtnText: {
+    color: Colors.white,
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

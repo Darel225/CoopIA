@@ -22,6 +22,7 @@ import {
   Alert,
   Platform,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -47,6 +48,7 @@ const QUICK_ACTIONS = [
     title:       'Déclarer une récolte',
     subtitle:    'Pesée, bordereau et sacs de fèves',
     route:       '/(tabs)/ai-chat',
+    params:      { prefill: 'Bonjour, je souhaite déclarer ma récolte.' },
   },
   {
     id: 'diagnose',
@@ -56,6 +58,7 @@ const QUICK_ACTIONS = [
     title:       'Signaler une maladie',
     subtitle:    'Diagnostic IA instantané par photo',
     route:       '/(tabs)/ai-chat',
+    params:      { action: 'diagnose' },
   },
 ];
 
@@ -84,7 +87,7 @@ function formatRelativeTime(dateString) {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { cooperative_name, firstName, prenom, nom, quartier, ville, userId } = useUserStore();
+  const { avatar, cooperative_name, firstName, prenom, nom, quartier, ville, userId } = useUserStore();
 
   const displayName =
     firstName || prenom || (nom ? nom.split(' ')[0] : null) || 'Planteur';
@@ -338,7 +341,11 @@ export default function HomeScreen() {
             onPress={() => router.push('/(tabs)/profile')}
             activeOpacity={0.8}
           >
-            <Text style={styles.avatarInitials}>{initials}</Text>
+            {avatar ? (
+              <Image source={{ uri: avatar }} style={styles.avatarImage} />
+            ) : (
+              <Text style={styles.avatarInitials}>{initials}</Text>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -367,7 +374,7 @@ export default function HomeScreen() {
                 iconColor={action.iconColor}
                 title={action.title}
                 subtitle={action.subtitle}
-                onPress={() => router.push(action.route)}
+                onPress={() => router.push({ pathname: action.route, params: action.params })}
               />
             ))}
           </View>
@@ -436,6 +443,11 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     fontSize: 12,
     flex: 1,
+  },
+  avatarImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
   avatarCircle: {
     width: 44,

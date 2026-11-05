@@ -128,10 +128,20 @@ export const chatService = {
     const safeName = 'voice_record.m4a';
     const formData = new FormData();
 
-    // Expo fetch WinterCG standard : fetch du fichier local vers un Blob standard
-    const localFileResponse = await fetch(audioUri);
-    const blob = await localFileResponse.blob();
-    formData.append('file', blob, safeName);
+    // Compatibilité Android APK natif & Web :
+    // Sur Android React Native, fetch(file://) lève Network request failed.
+    // L'objet multipart { uri, name, type } est requis nativement.
+    if (Platform.OS === 'web') {
+      const localFileResponse = await fetch(audioUri);
+      const blob = await localFileResponse.blob();
+      formData.append('file', blob, safeName);
+    } else {
+      formData.append('file', {
+        uri: audioUri,
+        name: safeName,
+        type: 'audio/m4a',
+      });
+    }
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);

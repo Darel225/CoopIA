@@ -29,16 +29,21 @@ import { useUserStore } from '../../store/useUserStore';
 // Numéro valide = au moins 8 chiffres
 const isValidPhone = (n) => n.replace(/\D/g, '').length >= 8;
 
-// Normalise le numéro au format E.164
+// Normalise le numéro au format E.164 sans tronquer l'indicatif opérateur ivoirien (10 chiffres)
 const normalizePhone = (input) => {
   let cleaned = input.replace(/[\s\-()]/g, '');
   if (cleaned.startsWith('00')) {
     cleaned = '+' + cleaned.slice(2);
   }
+  if (cleaned.startsWith('+225')) {
+    return cleaned;
+  }
+  if (cleaned.startsWith('225') && cleaned.length >= 12) {
+    return '+' + cleaned;
+  }
   if (!cleaned.startsWith('+')) {
-    if (cleaned.startsWith('0')) {
-      cleaned = cleaned.slice(1);
-    }
+    // En Côte d'Ivoire, les numéros ont 10 chiffres (ex: 07 01 02 03 04).
+    // On conserve le numéro complet avec son préfixe opérateur.
     cleaned = '+225' + cleaned;
   }
   return cleaned;
