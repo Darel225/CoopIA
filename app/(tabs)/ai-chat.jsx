@@ -66,10 +66,11 @@ function isValidUuid(id) {
 // ─── Écran principal ────────────────────────────────────────────────────────
 export default function AiChatScreen() {
   const { avatar, firstName, prenom, sessionId: storeSessionId, setUserData } = useUserStore();
-  const { prefill, sessionId: historySessionId, titre, action } = useLocalSearchParams();
+  const { prefill, sessionId: historySessionId, titre, action, timestamp } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const listRef = useRef(null);
   const router = useRouter();
+  const lastHandledTriggerRef = useRef(null);
 
   const validHistoryId = (historySessionId && isValidUuid(historySessionId)) ? historySessionId : null;
   const validStoreId = (storeSessionId && isValidUuid(storeSessionId)) ? storeSessionId : null;
@@ -87,20 +88,24 @@ export default function AiChatScreen() {
     setActiveSessionId(validH || validS || null);
   }, [historySessionId, storeSessionId]);
 
-  // Si déclenché via l'action rapide "Signaler une maladie", ouvrir directement le sélecteur photo
+  // Si déclenché via l'action rapide "Signaler une maladie" ou "Déclarer une récolte"
   useEffect(() => {
-    if (action === 'diagnose') {
+    const triggerKey = timestamp || (action ? `${action}_${Date.now()}` : null);
+    if (action === 'diagnose' && triggerKey && triggerKey !== lastHandledTriggerRef.current) {
+      lastHandledTriggerRef.current = triggerKey;
       setSheetOpen(true);
+      router.setParams({ action: '', timestamp: '' });
     }
-  }, [action]);
+  }, [action, timestamp, router]);
 
-  // Si un texte de pré-remplissage est fourni (ex: déclaration de récolte)
   useEffect(() => {
-    if (prefill) {
+    const triggerKey = timestamp || (prefill ? `${prefill}_${Date.now()}` : null);
+    if (prefill && triggerKey && triggerKey !== lastHandledTriggerRef.current) {
+      lastHandledTriggerRef.current = triggerKey;
       setMessage(prefill);
+      router.setParams({ prefill: '', timestamp: '' });
     }
-  }, [prefill]);
-
+  }, [prefill, timestamp, router]);
 
   const [message,        setMessage]        = useState(prefill || '');
   const [loading,        setLoading]        = useState(false);
@@ -129,18 +134,31 @@ export default function AiChatScreen() {
   const displayName = firstName || prenom || 'Planteur';
   const initials    = ((prenom || '')[0] || (firstName || 'A')[0]).toUpperCase();
 
-  // Prefill depuis l'historique
-  useEffect(() => { if (prefill) setMessage(prefill); }, [prefill]);
-
-  // Réinitialisation au focus sans historySessionId
+  // Déclenchement garanti à chaque focus pour les actions rapides
   useFocusEffect(
     useCallback(() => {
-      if (!historySessionId) { 
-        setMessages([]); 
-        setLoadingHistory(false); 
-        setActiveSessionId(null);
+      const triggerKey = timestamp || `${action || ''}_${prefill || ''}`;
+
+      if (action === 'diagnose' && triggerKey && triggerKey !== lastHandledTriggerRef.current) {
+        lastHandledTriggerRef.current = triggerKey;
+        setSheetOpen(true);
+        if (!historySessionId) {
+          setMessages([]);
+          setLoadingHistory(false);
+          setActiveSessionId(null);
+        }
+        router.setParams({ action: '', timestamp: '' });
+      } else if (prefill && triggerKey && triggerKey !== lastHandledTriggerRef.current) {
+        lastHandledTriggerRef.current = triggerKey;
+        setMessage(prefill);
+        if (!historySessionId) {
+          setMessages([]);
+          setLoadingHistory(false);
+          setActiveSessionId(null);
+        }
+        router.setParams({ prefill: '', timestamp: '' });
       }
-    }, [historySessionId])
+    }, [action, prefill, timestamp, historySessionId, router])
   );
 
   // Chargement de l'historique de conversation

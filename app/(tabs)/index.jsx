@@ -374,7 +374,15 @@ export default function HomeScreen() {
                 iconColor={action.iconColor}
                 title={action.title}
                 subtitle={action.subtitle}
-                onPress={() => router.push({ pathname: action.route, params: action.params })}
+                onPress={() => {
+                  router.push({
+                    pathname: action.route,
+                    params: {
+                      ...action.params,
+                      timestamp: String(Date.now()),
+                    },
+                  });
+                }}
               />
             ))}
           </View>
