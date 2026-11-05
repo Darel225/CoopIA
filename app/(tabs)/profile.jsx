@@ -136,14 +136,15 @@ export default function ProfileScreen() {
   // ─── Modification du profil ────────────────────────────────────────────────
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editFullName, setEditFullName] = useState('');
-  const [editVillage, setEditVillage] = useState('');
-  const [editCrop, setEditCrop] = useState('cacao');
+  const [editPhone, setEditPhone] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
 
   const handleOpenEditModal = () => {
     setEditFullName(displayName !== 'Planteur' ? displayName : '');
-    setEditVillage(quartier || zone || '');
-    setEditCrop(crops && crops.length > 0 ? crops[0] : 'cacao');
+    const cleanDigits = (rawPhone || '').replace(/\D/g, '');
+    let local = cleanDigits.startsWith('225') ? cleanDigits.slice(3) : cleanDigits;
+    if (local.length === 9 && !local.startsWith('0')) local = '0' + local;
+    setEditPhone(local);
     setEditModalVisible(true);
   };
 
@@ -152,10 +153,17 @@ export default function ProfileScreen() {
       Alert.alert('Nom requis', 'Veuillez saisir votre nom complet.');
       return;
     }
-    if (!editVillage.trim()) {
-      Alert.alert('Village requis', 'Veuillez préciser votre village ou localité.');
+
+    const cleanDigits = editPhone.replace(/\D/g, '');
+    let localPhone = cleanDigits.startsWith('225') ? cleanDigits.slice(3) : cleanDigits;
+    if (localPhone.length === 9 && !localPhone.startsWith('0')) localPhone = '0' + localPhone;
+
+    if (localPhone.length !== 10) {
+      Alert.alert('Numéro invalide', 'Le numéro de téléphone doit comporter exactement 10 chiffres (ex: 05 56 25 54 95).');
       return;
     }
+
+    const formattedE164 = `+225${localPhone}`;
 
     setSavingProfile(true);
     try {
@@ -186,9 +194,8 @@ export default function ProfileScreen() {
           last_name: lName,
           nom: lName,
           prenom: pName,
-          village: editVillage.trim(),
-          culture: editCrop,
-          culture_principale: editCrop,
+          phone_number: formattedE164,
+          telephone: formattedE164,
         }),
       });
 
@@ -199,9 +206,8 @@ export default function ProfileScreen() {
           firstName: updatedUser.first_name || pName,
           prenom: updatedUser.first_name || pName,
           nom: updatedUser.last_name || lName,
-          zone: updatedUser.village || editVillage.trim(),
-          quartier: updatedUser.village || editVillage.trim(),
-          crops: [updatedUser.culture || editCrop],
+          phone: updatedUser.phone_number || formattedE164,
+          email: updatedUser.phone_number || formattedE164,
         });
         setEditModalVisible(false);
         Alert.alert('✅ Profil mis à jour', 'Vos informations ont été enregistrées avec succès.');
@@ -483,7 +489,7 @@ export default function ProfileScreen() {
               iconBgColor={Colors.primaryLight}
               iconColor={Colors.primary}
               title="Modifier mes informations"
-              subtitle="Nom, village et culture principale"
+              subtitle="Nom, prénom et numéro de téléphone"
               onPress={handleOpenEditModal}
               hideDivider
             />
@@ -552,9 +558,32 @@ export default function ProfileScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
+              {/* Photo de profil rapide */}
+              <TouchableOpacity
+                style={styles.modalAvatarRow}
+                onPress={handlePickAvatar}
+                activeOpacity={0.8}
+              >
+                <View style={styles.modalAvatarCircle}>
+                  {avatar ? (
+                    <Image source={{ uri: avatar }} style={styles.modalAvatarImg} />
+                  ) : (
+                    <Text style={styles.avatarInitials}>{initials}</Text>
+                  )}
+                  <View style={styles.modalCameraPill}>
+                    <Ionicons name="camera" size={12} color={Colors.white} />
+                  </View>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.modalAvatarTitle}>Photo de profil</Text>
+                  <Text style={styles.modalAvatarSubtitle}>Appuyez pour changer votre photo</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+              </TouchableOpacity>
+
               {/* Champ Nom Complet */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>NOM COMPLET</Text>
+                <Text style={styles.inputLabel}>NOM ET PRÉNOM</Text>
                 <TextInput
                   style={styles.textInput}
                   value={editFullName}
@@ -564,26 +593,60 @@ export default function ProfileScreen() {
                 />
               </View>
 
-              {/* Champ Village / Localité */}
+              {/* Champ Numéro de Téléphone */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>VILLAGE OU LOCALITÉ</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={editVillage}
-                  onChangeText={setEditVillage}
-                  placeholder="Ex: Pindikro"
-                  placeholderTextColor={Colors.textMuted}
-                />
+                <Text style={styles.inputLabel}>NUMÉRO DE TÉLÉPHONE (10 CHIFFRES)</Text>
+                <View style={styles.phoneInputContainer}>
+                  <View style={styles.ciFlagPrefix}>
+                    <Text style={styles.flagText}>🇨🇮 +225</Text>
+                  </View>
+                  <TextInput
+                    style={styles.phoneTextInput}
+                    value={editPhone}
+                    onChangeText={setEditPhone}
+                    placeholder="05 56 25 54 95"
+                    placeholderTextColor={Colors.textMuted}
+                    keyboardType="phone-pad"
+                    maxLength={14}
+                  />
+                </View>
+                <Text style={styles.inputHelperText}>Format officiel national (ex: 05 56 25 54 95)</Text>
               </View>
 
-              {/* Sélecteur de Culture */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>CULTURE PRINCIPALE (FILIÈRES CAPED)</Text>
-                <CropSelectorGrid
-                  selected={[editCrop]}
-                  onToggle={(cropId) => setEditCrop(cropId)}
-                  multiSelect={false}
-                />
+              {/* Cadre Certifié CAPED (Village & Filière en lecture seule) */}
+              <View style={styles.certifiedCard}>
+                <View style={styles.certifiedHeader}>
+                  <Ionicons name="shield-checkmark" size={16} color={Colors.primary} />
+                  <Text style={styles.certifiedBadgeText}>DONNÉES CADASTRALES CERTIFIÉES</Text>
+                </View>
+
+                <View style={styles.certifiedRow}>
+                  <View style={styles.certifiedIconBg}>
+                    <Ionicons name="location" size={14} color={Colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.certifiedSubLabel}>Localité / Village</Text>
+                    <Text style={styles.certifiedValText}>{locationLabel}</Text>
+                  </View>
+                  <Ionicons name="lock-closed" size={14} color="#9CA3AF" />
+                </View>
+
+                <View style={styles.certifiedDivider} />
+
+                <View style={styles.certifiedRow}>
+                  <View style={styles.certifiedIconBg}>
+                    <Ionicons name="leaf" size={14} color={Colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.certifiedSubLabel}>Filière Officielle</Text>
+                    <Text style={styles.certifiedValText}>{cropDisplay}</Text>
+                  </View>
+                  <Ionicons name="lock-closed" size={14} color="#9CA3AF" />
+                </View>
+
+                <Text style={styles.certifiedFooterNote}>
+                  🔒 Les données parcellaires sont auditées par la coopérative. Pour toute modification de parcelle ou de filière, contactez l'assistance CAPED.
+                </Text>
               </View>
 
               {/* Bouton de sauvegarde */}
@@ -824,5 +887,143 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 15,
     fontWeight: '700',
+  },
+  modalAvatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 16,
+    gap: 12,
+  },
+  modalAvatarCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  modalAvatarImg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  modalCameraPill: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    left: 0,
+    height: 16,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalAvatarTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  modalAvatarSubtitle: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  phoneInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  ciFlagPrefix: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 12,
+    paddingVertical: 13,
+    borderRightWidth: 1,
+    borderRightColor: '#E5E7EB',
+  },
+  flagText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  phoneTextInput: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: Colors.text,
+    fontWeight: '600',
+  },
+  inputHelperText: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    marginTop: 5,
+    marginLeft: 4,
+  },
+  certifiedCard: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 18,
+  },
+  certifiedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 10,
+  },
+  certifiedBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: Colors.primary,
+    letterSpacing: 0.8,
+  },
+  certifiedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 6,
+  },
+  certifiedIconBg: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  certifiedSubLabel: {
+    fontSize: 11,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  certifiedValText: {
+    fontSize: 14,
+    color: Colors.text,
+    fontWeight: '700',
+    marginTop: 1,
+  },
+  certifiedDivider: {
+    height: 1,
+    backgroundColor: '#DCFCE7',
+    marginVertical: 4,
+  },
+  certifiedFooterNote: {
+    fontSize: 11,
+    color: '#15803D',
+    marginTop: 10,
+    lineHeight: 15,
+    fontStyle: 'italic',
   },
 });
