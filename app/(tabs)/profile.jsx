@@ -469,6 +469,7 @@ export default function ProfileScreen() {
               iconColor={Colors.primary}
               subtitle="Zone géographique"
               title={locationLabel}
+              hideChevron
             />
             <SettingsRow
               icon="call-outline"
@@ -476,6 +477,7 @@ export default function ProfileScreen() {
               iconColor={Colors.primary}
               subtitle="Téléphone"
               title={phoneDisplay}
+              hideChevron
             />
             <SettingsRow
               icon="leaf-outline"
@@ -483,6 +485,7 @@ export default function ProfileScreen() {
               iconColor={Colors.primary}
               subtitle="Culture Principale"
               title={cropDisplay}
+              hideChevron
             />
             <SettingsRow
               icon="create-outline"

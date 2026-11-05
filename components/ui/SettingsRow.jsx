@@ -1,4 +1,4 @@
-﻿/**
+/**
  * CoopIA — SettingsRow
  *
  * Ligne de réglage réutilisable au style iOS Settings.
@@ -13,6 +13,7 @@
  *   onPress        {func}      — Action au tap
  *   isDestructive  {boolean}   — Mode rouge : texte + icône + chevron en rouge
  *   hideDivider    {boolean}   — Masque la bordure basse (dernier item d'une card)
+ *   hideChevron    {boolean}   — Masque le chevron droit pour les lignes informatives
  *   rightNode      {ReactNode} — Remplace le chevron par un composant custom
  */
 
@@ -30,6 +31,7 @@ export default function SettingsRow({
   onPress,
   isDestructive  = false,
   hideDivider    = false,
+  hideChevron    = false,
   rightNode      = null,
 }) {
   const scale    = useRef(new Animated.Value(1)).current;
@@ -42,13 +44,14 @@ export default function SettingsRow({
   const resolvedChevronClr = isDestructive ? Colors.error : Colors.textMuted;
 
   return (
-    <Animated.View style={{ transform: [{ scale }] }}>
+    <Animated.View style={{ transform: [{ scale: onPress ? scale : 1 }] }}>
       <TouchableOpacity
         style={[styles.row, !hideDivider && styles.rowBorder]}
         onPress={onPress}
-        onPressIn={pressIn}
-        onPressOut={pressOut}
-        activeOpacity={1}
+        disabled={!onPress}
+        onPressIn={onPress ? pressIn : undefined}
+        onPressOut={onPress ? pressOut : undefined}
+        activeOpacity={onPress ? 0.8 : 1}
       >
         {/* ── Icône arrondie ── */}
         <View style={[styles.iconBox, { backgroundColor: resolvedIconBg }]}>
@@ -69,9 +72,11 @@ export default function SettingsRow({
         </View>
 
         {/* ── Droite ── */}
-        {rightNode ? rightNode : (
+        {rightNode ? rightNode : !hideChevron && onPress ? (
           <Ionicons name="chevron-forward" size={16} color={resolvedChevronClr} />
-        )}
+        ) : !hideChevron && !onPress ? (
+          null
+        ) : null}
       </TouchableOpacity>
     </Animated.View>
   );
