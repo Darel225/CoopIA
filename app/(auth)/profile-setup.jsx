@@ -1,4 +1,4 @@
-﻿/**
+/**
  * CoopIA — Profile Setup Screen (auth/profile-setup.jsx)
  *
  * Dernière étape du flow d'inscription.
@@ -185,17 +185,15 @@ export default function ProfileSetupScreen() {
           const safeName = avatar.split('/').pop() || 'avatar.jpg';
           const formData = new FormData();
 
-          if (Platform.OS === 'web') {
-            try {
-              const localFileResponse = await fetch(avatar);
-              const originalBlob = await localFileResponse.blob();
-              formData.append('file', originalBlob, safeName);
-            } catch (blobErr) {
-              formData.append('file', { uri: avatar, name: safeName, type: 'image/jpeg' });
-            }
-          } else {
+          // Compatibilité Expo 51+ / React Native 0.76+ (WinterCG Blob standard) :
+          try {
+            const localFileResponse = await fetch(avatar);
+            const blob = await localFileResponse.blob();
+            formData.append('file', blob, safeName);
+          } catch (blobErr) {
+            console.warn('Avatar setup blob fallback:', blobErr);
             formData.append('file', {
-              uri: avatar,
+              uri: Platform.OS === 'ios' ? avatar.replace('file://', '') : avatar,
               name: safeName,
               type: 'image/jpeg',
             });

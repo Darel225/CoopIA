@@ -47,7 +47,8 @@
       "router": {},
       "eas": {
         "projectId": "4c96457b-b437-4519-87a5-cce723a1cafb"
-      }
+      },
+      "EXPO_PUBLIC_USE_RN_FETCH": "1"
     }
   }
 }

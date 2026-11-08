@@ -81,20 +81,15 @@ export const chatService = {
 
     const formData = new FormData();
 
-    // Compatibilité Android APK natif & Web :
-    // Sur Android React Native, fetch(file://) lève Network request failed.
-    // L'objet multipart natif { uri, name, type } est requis sur Android/iOS.
-    if (Platform.OS === 'web') {
-      try {
-        const localFileResponse = await fetch(imageUri);
-        const originalBlob = await localFileResponse.blob();
-        formData.append('file', originalBlob, safeName);
-      } catch (blobErr) {
-        formData.append('file', { uri: imageUri, name: safeName, type: safeType });
-      }
-    } else {
+    // Compatibilité Expo 51+ / React Native 0.76+ (WinterCG Blob standard) :
+    try {
+      const localFileResponse = await fetch(imageUri);
+      const blob = await localFileResponse.blob();
+      formData.append('file', blob, safeName);
+    } catch (blobErr) {
+      console.warn('Fetch blob fallback:', blobErr);
       formData.append('file', {
-        uri: imageUri,
+        uri: Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri,
         name: safeName,
         type: safeType,
       });
@@ -141,16 +136,15 @@ export const chatService = {
     const safeName = 'voice_record.m4a';
     const formData = new FormData();
 
-    // Compatibilité Android APK natif & Web :
-    // Sur Android React Native, fetch(file://) lève Network request failed.
-    // L'objet multipart { uri, name, type } est requis nativement.
-    if (Platform.OS === 'web') {
+    // Compatibilité Expo 51+ / React Native 0.76+ (WinterCG Blob standard) :
+    try {
       const localFileResponse = await fetch(audioUri);
       const blob = await localFileResponse.blob();
       formData.append('file', blob, safeName);
-    } else {
+    } catch (blobErr) {
+      console.warn('Audio blob fallback:', blobErr);
       formData.append('file', {
-        uri: audioUri,
+        uri: Platform.OS === 'ios' ? audioUri.replace('file://', '') : audioUri,
         name: safeName,
         type: 'audio/m4a',
       });
