@@ -65,10 +65,14 @@ export const chatService = {
   },
 
   async sendDiagnosisImage(imageUri, mimeType, fileName, sessionId, token) {
-    const safeName = fileName ? String(fileName) : (String(imageUri).split('/').pop() || 'photo.jpg');
-    
+    let safeName = fileName ? String(fileName) : (String(imageUri).split('/').pop() || 'diagnostic.jpg');
+    safeName = safeName.replace(/\.(heic|heif)$/i, '.jpg');
+    if (!/\.(jpg|jpeg|png|webp)$/i.test(safeName)) {
+      safeName += '.jpg';
+    }
+
     let safeType = mimeType;
-    if (!safeType) {
+    if (!safeType || safeType === 'application/octet-stream' || safeType.includes('heic') || safeType.includes('heif')) {
       const lowerName = safeName.toLowerCase();
       if (lowerName.endsWith('.png')) {
         safeType = 'image/png';
@@ -81,10 +85,12 @@ export const chatService = {
 
     const formData = new FormData();
 
-    // Compatibilité Expo 51+ / React Native 0.76+ (WinterCG Blob standard) :
+    // Compatibilité Expo 51+ / React Native 0.76+ (WinterCG Blob avec MIME type explicite) :
     try {
       const localFileResponse = await fetch(imageUri);
-      const blob = await localFileResponse.blob();
+      const rawBlob = await localFileResponse.blob();
+      // On force le MIME type valide sur le Blob via .slice(0, size, safeType)
+      const blob = (rawBlob && rawBlob.slice) ? rawBlob.slice(0, rawBlob.size, safeType) : rawBlob;
       formData.append('file', blob, safeName);
     } catch (blobErr) {
       console.warn('Fetch blob fallback:', blobErr);
@@ -95,7 +101,7 @@ export const chatService = {
       });
     }
 
-    if (sessionId) {
+    if (sessionId && sessionId !== 'null' && sessionId !== 'undefined') {
       formData.append('session_id', String(sessionId));
     }
 
@@ -136,10 +142,11 @@ export const chatService = {
     const safeName = 'voice_record.m4a';
     const formData = new FormData();
 
-    // Compatibilité Expo 51+ / React Native 0.76+ (WinterCG Blob standard) :
+    // Compatibilité Expo 51+ / React Native 0.76+ (WinterCG Blob avec MIME type explicite) :
     try {
       const localFileResponse = await fetch(audioUri);
-      const blob = await localFileResponse.blob();
+      const rawBlob = await localFileResponse.blob();
+      const blob = (rawBlob && rawBlob.slice) ? rawBlob.slice(0, rawBlob.size, 'audio/m4a') : rawBlob;
       formData.append('file', blob, safeName);
     } catch (blobErr) {
       console.warn('Audio blob fallback:', blobErr);

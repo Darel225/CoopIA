@@ -267,13 +267,21 @@ export default function AiChatScreen() {
 
       const fileExt = uri.split('.').pop()?.toLowerCase();
       let derivedMime = 'image/jpeg';
-      if (fileExt === 'png') derivedMime = 'image/png';
-      else if (fileExt === 'webp') derivedMime = 'image/webp';
-      else if (fileExt === 'heic') derivedMime = 'image/heic';
-      else if (fileExt === 'heif') derivedMime = 'image/heif';
+      let safeExt = 'jpg';
+      if (fileExt === 'png') {
+        derivedMime = 'image/png';
+        safeExt = 'png';
+      } else if (fileExt === 'webp') {
+        derivedMime = 'image/webp';
+        safeExt = 'webp';
+      }
 
-      const mimeType = asset.mimeType || derivedMime;
-      const fileName = asset.fileName || `diagnostic-${Date.now()}.${fileExt || 'jpg'}`;
+      const mimeType = (asset.mimeType && !asset.mimeType.includes('heic') && !asset.mimeType.includes('heif'))
+        ? asset.mimeType
+        : derivedMime;
+      const fileName = asset.fileName
+        ? asset.fileName.replace(/\.(heic|heif)$/i, `.${safeExt}`)
+        : `diagnostic-${Date.now()}.${safeExt}`;
 
       const photoMsgText = `[IMAGE]${uri}`;
       setMessage('');

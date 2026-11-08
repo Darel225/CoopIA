@@ -262,10 +262,11 @@ export default function ProfileScreen() {
           const safeName = localUri.split('/').pop() || 'avatar.jpg';
           const formData = new FormData();
 
-          // Compatibilité Expo 51+ / React Native 0.76+ (WinterCG Blob standard) :
+          // Compatibilité Expo 51+ / React Native 0.76+ (WinterCG Blob avec MIME type explicite) :
           try {
             const localFileResponse = await fetch(localUri);
-            const blob = await localFileResponse.blob();
+            const rawBlob = await localFileResponse.blob();
+            const blob = (rawBlob && rawBlob.slice) ? rawBlob.slice(0, rawBlob.size, 'image/jpeg') : rawBlob;
             formData.append('file', blob, safeName);
           } catch (err) {
             console.warn('Avatar blob fallback:', err);
