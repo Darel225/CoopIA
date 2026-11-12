@@ -1,11 +1,5 @@
 /**
- * CoopIA — Profile Screen (tabs/profile.jsx)
- *
- * Layout : Header vert avec "Mon Profil" + avatar modifiable + pill lieu
- *          Conteneur off-white chevauchant (Colors.surface, borderTopRadius 32).
- * Sections :
- *   - INFORMATIONS (Zone, Téléphone, Culture)
- *   - PARAMÈTRES (Assistance CAPED, Vider l'historique, À propos, Déconnexion)
+  Ce fichier construit la page Mon Profil.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -35,12 +29,12 @@ import { useUserStore } from '../../store/useUserStore';
 import SettingsRow from '../../components/ui/SettingsRow';
 import CropSelectorGrid from '../../components/ui/CropSelectorGrid';
 
-// ─── Titre de section ────────────────────────────────────────────────────────
+// ─── affiche un titre de section ────────────────────────────────────────────────────────
 const SectionTitle = ({ label }) => (
   <Text style={styles.sectionTitle}>{label}</Text>
 );
 
-// ─── Carte groupée (iOS-style) ──────────────────────────────────────────────
+// ─── met plusieurs lignes de réglages dans un même cadre ──────────────────────────────────────────────
 const SettingsCard = ({ children }) => (
   <View style={styles.card}>{children}</View>
 );
@@ -65,7 +59,7 @@ export default function ProfileScreen() {
   const [clearing, setClearing] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
-  // Synchronise automatiquement les infos complètes de l'utilisateur au montage
+  // Recharger les informations depuis le serveur
   useEffect(() => {
     (async () => {
       try {
@@ -104,7 +98,7 @@ export default function ProfileScreen() {
     })();
   }, []);
 
-  // ─── Données affichées ─────────────────────────────────────────────────────
+  // ─── Préparer les informations affichées ─────────────────────────────────────────────────────
   const displayName = `${prenom || firstName || ''} ${nom || ''}`.trim() || 'Planteur';
   const initials = (
     ((prenom || firstName || 'P')[0]).toUpperCase() +
@@ -133,7 +127,7 @@ export default function ProfileScreen() {
     ? crops[0].charAt(0).toUpperCase() + crops[0].slice(1) + ' (Filière Officielle)'
     : 'Cacao (Filière Officielle)';
 
-  // ─── Modification du profil ────────────────────────────────────────────────
+  // ─── Ouvrir la fenêtre de Modification du profil ────────────────────────────────────────────────
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editFullName, setEditFullName] = useState('');
   const [editPhone, setEditPhone] = useState('');
@@ -240,6 +234,7 @@ export default function ProfileScreen() {
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
+        base64: true,
       });
 
       if (result.canceled || !result.assets || result.assets.length === 0) return;
@@ -261,20 +256,47 @@ export default function ProfileScreen() {
         try {
           const safeName = localUri.split('/').pop() || 'avatar.jpg';
           const formData = new FormData();
+          const base64Data = result.assets[0].base64;
 
-          // Compatibilité Expo 51+ / React Native 0.76+ (WinterCG Blob avec MIME type explicite) :
-          try {
-            const localFileResponse = await fetch(localUri);
-            const rawBlob = await localFileResponse.blob();
-            const blob = (rawBlob && rawBlob.slice) ? rawBlob.slice(0, rawBlob.size, 'image/jpeg') : rawBlob;
-            formData.append('file', blob, safeName);
-          } catch (err) {
-            console.warn('Avatar blob fallback:', err);
-            formData.append('file', {
-              uri: Platform.OS === 'ios' ? localUri.replace('file://', '') : localUri,
-              name: safeName,
-              type: 'image/jpeg',
-            });
+          let fileAttached = false;
+          if (base64Data) {
+            try {
+              const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+              const str = String(base64Data).replace(/[\r\n\t ]/g, '');
+              const len = str.length;
+              let p = 0;
+              const u8 = new Uint8Array(((len * 3) / 4) - (str.indexOf('=') > 0 ? (len - str.indexOf('=')) : 0));
+              for (let i = 0; i < len; i += 4) {
+                const a = chars.indexOf(str[i]);
+                const b = chars.indexOf(str[i + 1]);
+                const c = chars.indexOf(str[i + 2]);
+                const d = chars.indexOf(str[i + 3]);
+                u8[p++] = (a << 2) | (b >> 4);
+                if (c !== 64 && c !== -1) u8[p++] = ((b & 15) << 4) | (c >> 2);
+                if (d !== 64 && d !== -1) u8[p++] = ((c & 3) << 6) | d;
+              }
+              const blob = new Blob([u8], { type: 'image/jpeg' });
+              if (blob && blob.size > 0) {
+                formData.append('file', blob, safeName);
+                fileAttached = true;
+              }
+            } catch (b64Err) {
+              console.warn('Profile base64 err:', b64Err);
+            }
+          }
+
+          if (!fileAttached) {
+            try {
+              const localFileResponse = await fetch(localUri);
+              const rawBlob = await localFileResponse.blob();
+              formData.append('file', rawBlob, safeName);
+            } catch (err) {
+              formData.append('file', {
+                uri: Platform.OS === 'ios' ? localUri.replace('file://', '') : localUri,
+                name: safeName,
+                type: 'image/jpeg',
+              });
+            }
           }
 
           const uploadRes = await fetch(`${BASE_URL}/profile/avatar`, {

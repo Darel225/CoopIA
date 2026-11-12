@@ -1,6 +1,4 @@
 /**
- * CoopIA — AI Chat Screen (tabs/ai-chat.jsx)
- *
  * Interface de chat avec l'IA agricole.
  * LOGIQUE MÉTIER INTÉGRALEMENT PRÉSERVÉE (chatService, historique, sessionId).
  * Nouveautés UI : header CoopIA, bulles repensées, QuickReplyChips, MediaUploadSheet.
@@ -37,7 +35,7 @@ import QuickReplyChips from '../../components/chat/QuickReplyChips';
 import MediaUploadSheet from '../../components/chat/MediaUploadSheet';
 
 import ChatBubble from '../../components/chat/ChatBubble';
-
+/** Cette fonction transforme les messages API en structure facile à afficher dans le chat. */
 function mapApiMessage(msg) {
   if (!msg) return null;
   return {
@@ -48,7 +46,7 @@ function mapApiMessage(msg) {
     recommendations: msg.recommendations || []
   };
 }
-
+/** On récupère le token d'authentification stocké en sécurité. */
 async function getToken() {
   if (Platform.OS !== 'web') {
     return await SecureStore.getItemAsync('userToken');
@@ -57,6 +55,7 @@ async function getToken() {
   }
 }
 
+/**savoir si la session est valide ou si le chat doit créer une nouvelle conversation. */
 function isValidUuid(id) {
   if (!id) return false;
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -66,12 +65,14 @@ function isValidUuid(id) {
 // ─── Écran principal ────────────────────────────────────────────────────────
 export default function AiChatScreen() {
   const { avatar, firstName, prenom, sessionId: storeSessionId, setUserData } = useUserStore();
+  //Quand on vient d’un autre écran, on peut envoyer des paramètres. par exemple, prefill pour pré-remplir le message, action pour déclencher un diagnostic, titre pour le titre de la session, timestamp pour éviter les doublons.
   const { prefill, sessionId: historySessionId, titre, action, timestamp } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const listRef = useRef(null);
   const router = useRouter();
   const lastHandledTriggerRef = useRef(null);
-
+  // ici on verifie si la conversation est soit dans l'historique soit dans le store soit nulle et on garde la session active dans activeSessionId.
+  // (Je choisis la session de conversation que l’utilisateur doit continuer.)
   const validHistoryId = (historySessionId && isValidUuid(historySessionId)) ? historySessionId : null;
   const validStoreId = (storeSessionId && isValidUuid(storeSessionId)) ? storeSessionId : null;
   const [activeSessionId, setActiveSessionId] = useState(validHistoryId || validStoreId || null);
@@ -88,7 +89,7 @@ export default function AiChatScreen() {
     setActiveSessionId(validH || validS || null);
   }, [historySessionId, storeSessionId]);
 
-  // Si déclenché via l'action rapide "Signaler une maladie" ou "Déclarer une récolte"
+  // Quand on vient d’une action rapide (Signaler une maladie), on ouvre automatiquement le menu pour envoyer une photo
   useEffect(() => {
     const triggerKey = timestamp || (action ? `${action}_${Date.now()}` : null);
     if (action === 'diagnose' && triggerKey && triggerKey !== lastHandledTriggerRef.current) {
@@ -97,7 +98,7 @@ export default function AiChatScreen() {
       router.setParams({ action: '', timestamp: '' });
     }
   }, [action, timestamp, router]);
-
+  // Si l’écran arrive avec un texte déjà prêt, il l’écrit automatiquement dans le champ.
   useEffect(() => {
     const triggerKey = timestamp || (prefill ? `${prefill}_${Date.now()}` : null);
     if (prefill && triggerKey && triggerKey !== lastHandledTriggerRef.current) {
@@ -106,12 +107,13 @@ export default function AiChatScreen() {
       router.setParams({ prefill: '', timestamp: '' });
     }
   }, [prefill, timestamp, router]);
-
+  // Les états du chat
   const [message,        setMessage]        = useState(prefill || '');
   const [loading,        setLoading]        = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [messages,       setMessages]       = useState([]);
   const [sheetOpen,      setSheetOpen]      = useState(false);
+  //L’enregistrement vocal
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [isPreparingRecord, setIsPreparingRecord] = useState(false);
   const [isRecording,    setIsRecording]    = useState(false);
@@ -253,8 +255,8 @@ export default function AiChatScreen() {
       return;
     }
     const result = source === 'camera'
-      ? await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.8 })
-      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, quality: 0.8 });
+      ? await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.8, base64: true })
+      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, quality: 0.8, base64: true });
 
     if (!result.canceled && result.assets?.[0]?.uri) {
       const asset = result.assets[0];
@@ -296,7 +298,7 @@ export default function AiChatScreen() {
           return;
         }
 
-        const response = await chatService.sendDiagnosisImage(uri, mimeType, fileName, activeSessionId, token);
+        const response = await chatService.sendDiagnosisImage(uri, mimeType, fileName, activeSessionId, token, asset.base64);
         if (response?.session_id) {
           setActiveSessionId(response.session_id);
           setUserData({ sessionId: response.session_id });
