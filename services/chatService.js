@@ -1,6 +1,7 @@
 //**Ce fichier est le messager entre l’écran de chat et le serveur. */
 import { BASE_URL } from '../constants/api';
 import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system';
 
 export const chatService = {
   async getSessions(token) {
@@ -84,6 +85,45 @@ export const chatService = {
       }
     }
 
+    // SUR MOBILE (iOS & Android) : Utilisation directe de FileSystem.uploadAsync
+    // C'est le standard natif officiel Expo qui lit directement le fichier physique depuis le disque
+    if (Platform.OS !== 'web' && FileSystem && typeof FileSystem.uploadAsync === 'function') {
+      try {
+        const uploadResult = await FileSystem.uploadAsync(
+          `${BASE_URL}/diagnosis/visual`,
+          imageUri,
+          {
+            fieldName: 'file',
+            httpMethod: 'POST',
+            uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            parameters: (sessionId && sessionId !== 'null' && sessionId !== 'undefined')
+              ? { session_id: String(sessionId) }
+              : {},
+            mimeType: safeType,
+          }
+        );
+
+        if (uploadResult.status >= 200 && uploadResult.status < 300) {
+          return JSON.parse(uploadResult.body);
+        } else {
+          let errDetail = 'Erreur lors du diagnostic.';
+          try {
+            const parsed = JSON.parse(uploadResult.body);
+            errDetail = parsed.detail || errDetail;
+          } catch (e) {}
+          const error = new Error(errDetail);
+          error.status = uploadResult.status;
+          throw error;
+        }
+      } catch (fsErr) {
+        if (fsErr.status) throw fsErr;
+        console.warn('FileSystem.uploadAsync failed, attempting fallback:', fsErr);
+      }
+    }
+
     const formData = new FormData();
     let fileAttached = false;
 
@@ -103,7 +143,7 @@ export const chatService = {
       }
     }
 
-    // 2. Fallback XHR binaire natif (le standard historique React Native pour lire les file:// locaux)
+    // 2. Fallback XHR binaire natif
     if (!fileAttached) {
       try {
         const xhrBlob = await new Promise((resolve, reject) => {
