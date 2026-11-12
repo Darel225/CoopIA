@@ -1,12 +1,5 @@
 /**
- * CoopIA — Profile Setup Screen (auth/profile-setup.jsx)
- *
- * Dernière étape du flow d'inscription.
- * Collecte : nom complet, village/campement, photo avatar, culture principale.
- * Préserve intégralement la logique authService.updateProfile existante.
- *
- * ANTI-BUG ANDROID FOCUS : Aucune ombre dynamique sur les inputs.
- * Platform.select strict partout.
+ envoie les informations du profil après l’authentification.
  */
 
 import React, { useState, useRef } from 'react';
@@ -87,16 +80,16 @@ function FieldInput({
 
 // ─── Écran principal ───────────────────────────────────────────────────────
 export default function ProfileSetupScreen() {
-  const [fullName, setFullName]       = useState('');
-  const [village, setVillage]         = useState('');
-  const [superficie, setSuperficie]   = useState('');
-  const [avatar, setAvatar]           = useState(null);
+  const [fullName, setFullName] = useState('');
+  const [village, setVillage] = useState('');
+  const [superficie, setSuperficie] = useState('');
+  const [avatar, setAvatar] = useState(null);
   const [selectedCrops, setSelectedCrops] = useState([]);
-  const [loading, setLoading]         = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const zoneRef = useRef(null);
   const superficieRef = useRef(null);
-  const router  = useRouter();
+  const router = useRouter();
   const { setUserData, login } = useUserStore();
   const { email, phone_number, phone: paramPhone } = useLocalSearchParams();
 
@@ -105,9 +98,9 @@ export default function ProfileSetupScreen() {
 
   const isValid =
     fullName.trim().length >= 2 &&
-    village.trim().length  >= 2 &&
+    village.trim().length >= 2 &&
     isSuperficieValid &&
-    selectedCrops.length   >= 1;
+    selectedCrops.length >= 1;
 
   // ─── Photo avatar ────────────────────────────────────────────────────────
   const handlePickAvatar = async () => {
@@ -140,16 +133,16 @@ export default function ProfileSetupScreen() {
     const nom_complet = fullName.trim();
     const culture_principale = selectedCrops[0];
 
-    const parts  = nom_complet.split(/\s+/);
+    const parts = nom_complet.split(/\s+/);
     const prenom = parts.length > 1 ? parts[0] : '';
-    const nom    = parts.length > 1 ? parts.slice(1).join(' ') : parts[0];
+    const nom = parts.length > 1 ? parts.slice(1).join(' ') : parts[0];
 
     try {
       let token = null;
       try {
         token = await SecureStore.getItemAsync('userToken');
       } catch (e) {
-        try { token = localStorage.getItem('userToken'); } catch (err) {}
+        try { token = localStorage.getItem('userToken'); } catch (err) { }
       }
 
       const response = await fetch(`${BASE_URL}/profile/setup`, {
@@ -167,7 +160,7 @@ export default function ProfileSetupScreen() {
       });
 
       let data = null;
-      try { data = await response.json(); } catch (e) {}
+      try { data = await response.json(); } catch (e) { }
 
       if (!response.ok) {
         const detail = data?.detail;
@@ -189,7 +182,12 @@ export default function ProfileSetupScreen() {
           try {
             const localFileResponse = await fetch(avatar);
             const rawBlob = await localFileResponse.blob();
-            const blob = (rawBlob && rawBlob.slice) ? rawBlob.slice(0, rawBlob.size, 'image/jpeg') : rawBlob;
+            let blob = rawBlob;
+            try {
+              blob = new Blob([rawBlob], { type: 'image/jpeg' });
+            } catch (blobWrapErr) {
+              blob = rawBlob;
+            }
             formData.append('file', blob, safeName);
           } catch (blobErr) {
             console.warn('Avatar setup blob fallback:', blobErr);
@@ -225,12 +223,12 @@ export default function ProfileSetupScreen() {
         firstName: prenom || nom,
         prenom,
         nom,
-        phone:    effectivePhone,
-        email:    email || null,
-        avatar:   uploadedAvatarUrl,
-        zone:     village.trim(),
+        phone: effectivePhone,
+        email: email || null,
+        avatar: uploadedAvatarUrl,
+        zone: village.trim(),
         quartier: village.trim(),
-        crops:    selectedCrops,
+        crops: selectedCrops,
         superficie: parsedSuperficie,
       });
 

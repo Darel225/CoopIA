@@ -1,18 +1,17 @@
+// ─── Composant bulle de chat CoopIA ────────────────────────────────────────
 import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../../constants/Colors';
 import RecommendationCard from './RecommendationCard';
 
-// ─── Composant bulle de chat CoopIA ────────────────────────────────────────
-// Remplace l'ancien ChatBubble avec le nouveau style vert/blanc.
 export default function ChatBubble({ msg, initials }) {
   const isUser = msg.isUser;
 
   const isImage = msg.text && typeof msg.text === 'string' && msg.text.startsWith('[IMAGE]');
   const imageUrl = isImage ? msg.text.replace('[IMAGE]', '').trim() : null;
 
-  // Render agricultural recommendations if any
+  //Préparer les recommandations
   const recommendations = (!isUser && Array.isArray(msg.recommendations) && msg.recommendations.length > 0)
     ? msg.recommendations : [];
 
@@ -44,7 +43,7 @@ export default function ChatBubble({ msg, initials }) {
           )}
         </View>
 
-        {/* Recommendations display */}
+        {/* Afficher les recommandations après une réponse IA */}
         {!isUser && recommendations.map((rec, index) => {
           if (!rec || (typeof rec.titre !== 'string' && typeof rec.description !== 'string')) return null;
           return (

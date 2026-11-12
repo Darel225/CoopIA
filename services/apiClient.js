@@ -1,5 +1,5 @@
-﻿// services/apiClient.js
-// Configuration de base pour les requêtes réseau (axios ou fetch)
+﻿// ne communique pas réellement avec le serveur c'est un fichier de simulation pour le développement
+
 
 export const apiClient = {
   // Simule un appel GET

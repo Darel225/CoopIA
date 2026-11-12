@@ -1,15 +1,5 @@
 ﻿/**
- * CoopIA — MediaUploadSheet
- *
- * Bottom sheet modale pour le diagnostic par image.
- * Deux options : Caméra (recommandé) et Galerie.
- * Fond avec overlay sombre transparent derrière la feuille.
- *
- * Props :
- *   visible      {boolean}  — Contrôle l'affichage du sheet
- *   onClose      {func}     — Ferme le sheet
- *   onCamera     {func}     — Lance la caméra
- *   onGallery    {func}     — Ouvre la galerie
+ Composant affichant une fenêtre de choix quand l’utilisateur veut envoyer une photo dans le chat.
  */
 
 import React from 'react';

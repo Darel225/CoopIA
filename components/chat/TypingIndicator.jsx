@@ -1,3 +1,4 @@
+//**Ce composant affiche trois petits points animés pour montrer que l’assistant prépare sa réponse. */
 import React, { useRef, useEffect } from 'react';
 import { View, Animated, StyleSheet } from 'react-native';
 import Colors from '../../constants/Colors';

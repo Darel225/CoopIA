@@ -1,9 +1,5 @@
 /**
- * CoopIA — OTP Verification Screen (auth/verify-otp.jsx)
- *
- * 6 cases de saisie premium, clavier natif.
- * ANTI-BUG ANDROID : Aucune ombre dynamique sur les cases (Platform.select strict).
- * Logique de brute-force (5 essais max) et countdown de renvoi préservés.
+ envoie le code au serveur pour le vérifier. Si la connexion réussit, il stocke le jeton de connexion et met à jour l’état de l’utilisateur.
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';

@@ -1,15 +1,5 @@
 ﻿/**
- * CoopIA — ActionCard
- *
- * Carte d'action rapide. Icône colorée à gauche, titre + sous-titre, chevron droite.
- *
- * Props :
- *   iconName    {string}  — Nom Ionicons (ex: "scale-outline")
- *   iconBgColor {string}  — Fond du cercle d'icône (ex: Colors.primaryLight)
- *   iconColor   {string}  — Couleur de l'icône elle-même
- *   title       {string}  — Titre principal
- *   subtitle    {string}  — Description courte
- *   onPress     {func}    — Action au tap
+ * Carte d'action rapide. 
  */
 
 import React from 'react';

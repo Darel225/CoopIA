@@ -1,3 +1,4 @@
+//**Ce composant affiche une carte de conseil sous un message de l’assistant. */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';

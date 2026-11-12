@@ -1,20 +1,5 @@
 /**
- * CoopIA — SettingsRow
- *
- * Ligne de réglage réutilisable au style iOS Settings.
- * Structure : [IconBox] [Subtitle? + Title] [Chevron]
- *
- * Props :
- *   icon           {string}    — Nom Ionicons
- *   iconBgColor    {string}    — Fond du conteneur d'icône
- *   iconColor      {string}    — Couleur de l'icône
- *   subtitle       {string?}   — Label gris optionnel AU-DESSUS du titre
- *   title          {string}    — Valeur principale (bold, dark)
- *   onPress        {func}      — Action au tap
- *   isDestructive  {boolean}   — Mode rouge : texte + icône + chevron en rouge
- *   hideDivider    {boolean}   — Masque la bordure basse (dernier item d'une card)
- *   hideChevron    {boolean}   — Masque le chevron droit pour les lignes informatives
- *   rightNode      {ReactNode} — Remplace le chevron par un composant custom
+ Ce composant dessine une ligne dans la page Profil pour un réglage ou une action.
  */
 
 import React, { useRef } from 'react';
@@ -34,10 +19,11 @@ export default function SettingsRow({
   hideChevron    = false,
   rightNode      = null,
 }) {
+  //Le petit effet au toucher
   const scale    = useRef(new Animated.Value(1)).current;
   const pressIn  = () => Animated.spring(scale, { toValue: 0.975, useNativeDriver: true }).start();
   const pressOut = () => Animated.spring(scale, { toValue: 1,     useNativeDriver: true }).start();
-
+  //Le style des actions sensibles
   const resolvedIconColor  = isDestructive ? Colors.error : iconColor;
   const resolvedIconBg     = isDestructive ? '#FFF0EE'    : iconBgColor;
   const resolvedTitleColor = isDestructive ? Colors.error : Colors.text;

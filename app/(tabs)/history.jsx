@@ -1,11 +1,5 @@
 /**
- * CoopIA — History Screen (tabs/history.jsx)
- *
- * Layout : En-tête vert plein → Conteneur blanc chevauchant (borderRadius 28px).
- * LOGIQUE BACK-END INTÉGRALEMENT PRÉSERVÉE :
- *   - fetch /history/get-history
- *   - groupBySection, getSectionLabel, formatTime, getStatusStyle
- *   - useFocusEffect pour le rechargement
+ Ce fichier affiche l’historique des conversations de l’utilisateur avec l’IA et les récoltes déclarées. Il permet de rechercher, filtrer et accéder aux détails de chaque session.
  */
 
 import React, { useState, useCallback } from 'react';
@@ -40,7 +34,9 @@ async function getToken() {
   }
 }
 
-// ─── Utilitaires (LOGIQUE PRÉSERVÉE) ─────────────────────────────────────────
+// ─── Regrouper les conversations par date ─────────────────────────────────────────
+
+//Elle reçoit la date d’une conversation et retourne une catégorie
 function getSectionLabel(createdAt) {
   const now  = new Date();
   const date = new Date(createdAt);
@@ -52,7 +48,7 @@ function getSectionLabel(createdAt) {
   if (diff <= 30)  return 'Ce mois-ci';
   return 'Plus anciennes';
 }
-
+//Elle choisit comment afficher la date dans une carte
 function formatTime(createdAt) {
   const now  = new Date();
   const date = new Date(createdAt);
@@ -61,7 +57,7 @@ function formatTime(createdAt) {
   if (diff <= 6)  return date.toLocaleDateString('fr-FR', { weekday: 'short' });
   return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 }
-
+//Elle prend toutes les conversations, les range dans des groupes selon leur date, puis retourne des sections à afficher.
 function groupBySection(items) {
   const order = [];
   const map   = {};
@@ -73,7 +69,7 @@ function groupBySection(items) {
   return order.map(label => ({ label, items: map[label] }));
 }
 
-// ─── État vide ────────────────────────────────────────────────────────────────
+// ─── Afficher l’écran quand il n’y a aucune conversation ────────────────────────────────────────────────────────────────
 function EmptyState({ onGoToChat }) {
   return (
     <View style={styles.empty}>
@@ -105,7 +101,7 @@ export default function HistoryScreen() {
   const displayName = firstName || prenom || (nom ? nom.split(' ')[0] : 'Planteur');
   const initials    = ((prenom || '')[0] || (firstName || 'K')[0]).toUpperCase();
 
-  // ─── Fetch historique (LOGIQUE PRÉSERVÉE) ──────────────────────────────────
+  // ─── Charger les conversations ──────────────────────────────────
   useFocusEffect(
     useCallback(() => {
       async function fetchHistory() {
@@ -133,7 +129,7 @@ export default function HistoryScreen() {
     }, [])
   );
 
-  // ─── Filtrage par recherche ────────────────────────────────────────────────
+  // ─── Rechercher une conversation dans la barre de recherche ────────────────────────────────────────────────
   const filtered = query.trim()
     ? conversations.filter(c =>
         c.title?.toLowerCase().includes(query.toLowerCase())
@@ -186,7 +182,7 @@ export default function HistoryScreen() {
         </View>
       </View>
 
-      {/* ══ CONTENEUR BLANC CHEVAUCHANT ════════════════════════════════════ */}
+      {/* ══ Afficher le chargement, la liste vide ou les conversations ════════════════════════════════════ */}
       <View style={styles.sheet}>
         {/* Poignée */}
         <View style={styles.handle} />

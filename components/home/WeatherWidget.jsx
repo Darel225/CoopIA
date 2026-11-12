@@ -1,17 +1,6 @@
 /**
- * CoopIA — WeatherWidget
- *
- * Widget météo agricole dynamique avec fond Forest Green plein.
+ * Widget météo agricole dynamique.
  * Affiche température, condition, icône dynamique, et alerte pluie avec conseil agronomique.
- *
- * Props :
- *   temperature  {string}  — "29°C"
- *   condition    {string}  — "Ensoleillé voilé"
- *   alert        {string}  — Texte d'alerte pluie (partie 1, normale)
- *   advice       {string}  — Conseil agricole (partie 2, surlignée/blanche)
- *   iconName     {string}  — Ionicons icon name
- *   locality     {string}  — Nom du village ou de la parcelle
- *   loading      {boolean} — Indicateur de chargement
  */
 
 import React from 'react';

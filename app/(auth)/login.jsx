@@ -1,9 +1,5 @@
 /**
- * CoopIA — Login Screen (auth/login.jsx)
- *
- * Écran de connexion avec saisie du numéro de téléphone ivoirien (+225).
- * L'identifiant envoyé au backend reste sous forme normalisée (phone comme email-équivalent).
- * Aucun changement côté authService — mapping UI → payload géré ici.
+ ce fichier envoie le numéro de téléphone au serveur pour demander un code OTP.
  */
 
 import React, { useState } from 'react';

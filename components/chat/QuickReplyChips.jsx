@@ -1,12 +1,5 @@
 ﻿/**
- * CoopIA — QuickReplyChips
- *
- * Suggestions rapides horizontales défilables au-dessus de l'input.
- * Chaque chip envoie son texte dans l'input au tap.
- *
- * Props :
- *   onSelect  {func}    — Callback(text) appelé quand l'utilisateur tap un chip
- *   disabled  {boolean} — Désactive les chips pendant le chargement de l'IA
+ Ce composant affiche des suggestions de messages dans l’écran de chat. L’utilisateur peut cliquer sur une suggestion pour l’envoyer rapidement.
  */
 
 import React from 'react';

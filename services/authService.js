@@ -1,4 +1,5 @@
-﻿import { BASE_URL } from '../constants/api';
+﻿//Ce fichier regroupe des fonctions liées à l’authentification et au profil
+import { BASE_URL } from '../constants/api';
 
 export const authService = {
 

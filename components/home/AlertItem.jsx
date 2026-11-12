@@ -1,23 +1,6 @@
 /**
- * CoopIA — AlertItem
- *
  * Carte d'alerte ou d'activité agricole.
- * Cliquable pour ouvrir directement la session de diagnostic/chat correspondante.
- * Ligne du haut : icône + titre/sous-titre + timestamp.
- * Ligne du bas : pill de statut (optionnelle) + lien d'action.
- *
- * Props :
- *   iconName      {string}   — Ionicons icon
- *   iconBgColor   {string}   — Fond du badge icône
- *   iconColor     {string}   — Couleur de l'icône
- *   title         {string}   — Titre de l'alerte
- *   subtitle      {string}   — Description
- *   timestamp     {string}   — "Il y a 2h" | "Hier"
- *   statusLabel   {string}   — Texte du pill de statut (null = masqué)
- *   statusColor   {string}   — Couleur du texte du pill
- *   statusBg      {string}   — Fond du pill
- *   actionLabel   {string}   — Texte du lien d'action (null = masqué)
- *   onAction      {func}     — Callback d'ouverture de session
+ * Cliquable pour ouvrir directement la session de diagnostic/chat correspondante
  */
 
 import React from 'react';

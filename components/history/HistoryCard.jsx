@@ -1,13 +1,5 @@
 /**
- * CoopIA — HistoryCard
- *
- * Carte d'item de liste pour l'historique des activites agricoles.
- * Pas d'ombre propre — la separation visuelle vient du padding et du fond global.
- *
- * Props :
- *   item         {object}  — Donnees de la conversation/activite
- *   onPress      {func}    — Navigation vers le detail
- *   formatTime   {func}    — Utilitaire de formatage de date
+ Ce composant dessine une ligne de conversation dans l’écran Historique
  */
 
 import React, { useRef } from 'react';

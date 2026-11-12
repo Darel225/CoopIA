@@ -1,15 +1,5 @@
 /**
- * CoopIA — Home Dashboard (tabs/index.jsx)
- *
- * RÈGLE CRITIQUE ScrollView :
- *   → Les enfants directs d'un ScrollView ne doivent JAMAIS avoir flex:1.
- *
- * PATTERN RETENU :
- *   contentContainerStyle={{ flexGrow:1, justifyContent:'space-between' }}
- *   → Données 100% dynamiques :
- *     - Météo agricole connectée en temps réel (/weather/current)
- *     - Dernière activité connectée avec rechargement au focus (/activities/latest)
- *     - Pull-to-refresh natif (RefreshControl)
+  * Écran principal après connexion. Affiche la météo agricole, les actions rapides et la dernière activité.
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -62,7 +52,7 @@ const QUICK_ACTIONS = [
   },
 ];
 
-// Helper pour formater les temps relatifs en français
+// Fonction de formatage du temps relatif pour la dernière activité
 function formatRelativeTime(dateString) {
   if (!dateString) return 'Récemment';
   try {
@@ -103,7 +93,7 @@ export default function HomeScreen() {
 
   const [latestActivity, setLatestActivity] = useState(null);
 
-  // Rinitialiser l'activit ds que l'utilisateur change
+  // Réinitialisation de la dernière activité à null si l'utilisateur change (nouvelle connexion)
   useEffect(() => {
     setLatestActivity(null);
   }, [userId]);
@@ -118,7 +108,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadingWeather, setLoadingWeather] = useState(false);
 
-  // Fonction centrale de synchronisation temps réel
+  // Fonction pour aller chercher les données météo et la dernière activité depuis le backend
   const fetchDashboardData = useCallback(async () => {
     try {
       let token = null;
@@ -174,7 +164,7 @@ export default function HomeScreen() {
     }
   }, [ville, quartier]);
 
-  // Rechargement automatique dès que l'écran reprend le focus (ex: retour du chat ou des photos)
+  // Rechargement automatique dès que l'écran reprend le focus 
   useFocusEffect(
     useCallback(() => {
       fetchDashboardData();
@@ -187,7 +177,8 @@ export default function HomeScreen() {
     await fetchDashboardData();
     setRefreshing(false);
   }, [fetchDashboardData]);
-
+  
+  //  la localisation affichée dans le header.
   const location = quartier
     ? `${quartier}${ville ? ` • ${ville}` : ` • ${cooperative_name || 'Coopérative CAPED'}`}`
     : (cooperative_name || 'Coopérative CAPED');
@@ -389,7 +380,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* ── Groupe inférieur — poussé en bas par justifyContent:'space-between' ── */}
+      {/*Dernière Activité */}
       <View>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Dernière Activité</Text>
