@@ -265,7 +265,7 @@ export default function ProfileScreen() {
               const dataUrl = `data:image/jpeg;base64,${cleanBase64}`;
               const dataResponse = await fetch(dataUrl);
               const dataBlob = await dataResponse.blob();
-              if (dataBlob && dataBlob.size > 0) {
+              if (dataBlob) {
                 formData.append('file', dataBlob, safeName);
                 fileAttached = true;
               }
@@ -284,7 +284,7 @@ export default function ProfileScreen() {
                 xhr.open('GET', localUri, true);
                 xhr.send(null);
               });
-              if (xhrBlob && xhrBlob.size > 0) {
+              if (xhrBlob) {
                 formData.append('file', xhrBlob, safeName);
                 fileAttached = true;
               }
@@ -295,7 +295,7 @@ export default function ProfileScreen() {
 
           if (!fileAttached) {
             formData.append('file', {
-              uri: Platform.OS === 'ios' ? localUri.replace('file://', '') : localUri,
+              uri: localUri,
               name: safeName,
               type: 'image/jpeg',
             });

@@ -94,7 +94,7 @@ export const chatService = {
         const dataUrl = `data:${safeType};base64,${cleanBase64}`;
         const dataResponse = await fetch(dataUrl);
         const dataBlob = await dataResponse.blob();
-        if (dataBlob && dataBlob.size > 0) {
+        if (dataBlob) {
           formData.append('file', dataBlob, safeName);
           fileAttached = true;
         }
@@ -114,7 +114,7 @@ export const chatService = {
           xhr.open('GET', imageUri, true);
           xhr.send(null);
         });
-        if (xhrBlob && xhrBlob.size > 0) {
+        if (xhrBlob) {
           formData.append('file', xhrBlob, safeName);
           fileAttached = true;
         }
@@ -123,10 +123,10 @@ export const chatService = {
       }
     }
 
-    // 3. Dernier recours natif React Native { uri, name, type }
+    // 3. Dernier recours natif React Native { uri, name, type } avec l'URI complète file://
     if (!fileAttached) {
       formData.append('file', {
-        uri: Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri,
+        uri: imageUri,
         name: safeName,
         type: safeType,
       });
