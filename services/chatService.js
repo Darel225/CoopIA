@@ -1,7 +1,7 @@
 //**Ce fichier est le messager entre l’écran de chat et le serveur. */
 import { BASE_URL } from '../constants/api';
 import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 export const chatService = {
   async getSessions(token) {
@@ -95,7 +95,7 @@ export const chatService = {
           {
             fieldName: 'file',
             httpMethod: 'POST',
-            uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+            uploadType: (FileSystem && FileSystem.FileSystemUploadType && FileSystem.FileSystemUploadType.MULTIPART) ? FileSystem.FileSystemUploadType.MULTIPART : 1,
             headers: {
               Authorization: `Bearer ${token}`,
             },
