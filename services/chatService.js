@@ -2,28 +2,6 @@
 import { BASE_URL } from '../constants/api';
 import { Platform } from 'react-native';
 
-/**
- * Décode une chaîne base64 en un objet Blob binaire standard avec son type MIME.
- * Permet un téléversement 100% fiable sans dépendre du filesystem natif ou de fetch(file://).
- */
-function base64ToBlob(base64Data, contentType = 'image/jpeg') {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-  const str = String(base64Data).replace(/[\r\n\t ]/g, '');
-  const len = str.length;
-  let p = 0;
-  const u8 = new Uint8Array(((len * 3) / 4) - (str.indexOf('=') > 0 ? (len - str.indexOf('=')) : 0));
-  for (let i = 0; i < len; i += 4) {
-    const a = chars.indexOf(str[i]);
-    const b = chars.indexOf(str[i + 1]);
-    const c = chars.indexOf(str[i + 2]);
-    const d = chars.indexOf(str[i + 3]);
-    u8[p++] = (a << 2) | (b >> 4);
-    if (c !== 64 && c !== -1) u8[p++] = ((b & 15) << 4) | (c >> 2);
-    if (d !== 64 && d !== -1) u8[p++] = ((c & 3) << 6) | d;
-  }
-  return new Blob([u8], { type: contentType });
-}
-
 export const chatService = {
   async getSessions(token) {
     const response = await fetch(`${BASE_URL}/chat/sessions`, {
@@ -107,41 +85,51 @@ export const chatService = {
     }
 
     const formData = new FormData();
-
-    // 1. Priorité absolue : conversion directe base64 -> Blob (100% fiable, octets garantis, aucun 0-byte)
     let fileAttached = false;
+
+    // 1. Solution standard et native Expo / React Native : fetch sur data URI
     if (base64Data) {
       try {
-        const blob = base64ToBlob(base64Data, safeType);
-        if (blob && blob.size > 0) {
-          formData.append('file', blob, safeName);
+        const cleanBase64 = String(base64Data).replace(/[\r\n\t ]/g, '');
+        const dataUrl = `data:${safeType};base64,${cleanBase64}`;
+        const dataResponse = await fetch(dataUrl);
+        const dataBlob = await dataResponse.blob();
+        if (dataBlob && dataBlob.size > 0) {
+          formData.append('file', dataBlob, safeName);
           fileAttached = true;
         }
-      } catch (err) {
-        console.warn('Base64 to blob conversion failed:', err);
+      } catch (dataErr) {
+        console.warn('Data URI blob conversion failed:', dataErr);
       }
     }
 
-    // 2. Si non attaché, fallback par fetch blob ou objet natif React Native :
+    // 2. Fallback XHR binaire natif (le standard historique React Native pour lire les file:// locaux)
     if (!fileAttached) {
       try {
-        const localFileResponse = await fetch(imageUri);
-        const rawBlob = await localFileResponse.blob();
-        let blob = rawBlob;
-        try {
-          blob = new Blob([rawBlob], { type: safeType });
-        } catch (blobWrapErr) {
-          blob = rawBlob;
-        }
-        formData.append('file', blob, safeName);
-      } catch (blobErr) {
-        console.warn('Fetch blob fallback:', blobErr);
-        formData.append('file', {
-          uri: Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri,
-          name: safeName,
-          type: safeType,
+        const xhrBlob = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.onload = () => resolve(xhr.response);
+          xhr.onerror = (e) => reject(new TypeError('XHR file read failed'));
+          xhr.responseType = 'blob';
+          xhr.open('GET', imageUri, true);
+          xhr.send(null);
         });
+        if (xhrBlob && xhrBlob.size > 0) {
+          formData.append('file', xhrBlob, safeName);
+          fileAttached = true;
+        }
+      } catch (xhrErr) {
+        console.warn('XHR blob failed:', xhrErr);
       }
+    }
+
+    // 3. Dernier recours natif React Native { uri, name, type }
+    if (!fileAttached) {
+      formData.append('file', {
+        uri: Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri,
+        name: safeName,
+        type: safeType,
+      });
     }
 
     if (sessionId && sessionId !== 'null' && sessionId !== 'undefined') {

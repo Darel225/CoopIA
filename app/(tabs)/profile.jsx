@@ -261,23 +261,12 @@ export default function ProfileScreen() {
           let fileAttached = false;
           if (base64Data) {
             try {
-              const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-              const str = String(base64Data).replace(/[\r\n\t ]/g, '');
-              const len = str.length;
-              let p = 0;
-              const u8 = new Uint8Array(((len * 3) / 4) - (str.indexOf('=') > 0 ? (len - str.indexOf('=')) : 0));
-              for (let i = 0; i < len; i += 4) {
-                const a = chars.indexOf(str[i]);
-                const b = chars.indexOf(str[i + 1]);
-                const c = chars.indexOf(str[i + 2]);
-                const d = chars.indexOf(str[i + 3]);
-                u8[p++] = (a << 2) | (b >> 4);
-                if (c !== 64 && c !== -1) u8[p++] = ((b & 15) << 4) | (c >> 2);
-                if (d !== 64 && d !== -1) u8[p++] = ((c & 3) << 6) | d;
-              }
-              const blob = new Blob([u8], { type: 'image/jpeg' });
-              if (blob && blob.size > 0) {
-                formData.append('file', blob, safeName);
+              const cleanBase64 = String(base64Data).replace(/[\r\n\t ]/g, '');
+              const dataUrl = `data:image/jpeg;base64,${cleanBase64}`;
+              const dataResponse = await fetch(dataUrl);
+              const dataBlob = await dataResponse.blob();
+              if (dataBlob && dataBlob.size > 0) {
+                formData.append('file', dataBlob, safeName);
                 fileAttached = true;
               }
             } catch (b64Err) {
@@ -287,16 +276,29 @@ export default function ProfileScreen() {
 
           if (!fileAttached) {
             try {
-              const localFileResponse = await fetch(localUri);
-              const rawBlob = await localFileResponse.blob();
-              formData.append('file', rawBlob, safeName);
-            } catch (err) {
-              formData.append('file', {
-                uri: Platform.OS === 'ios' ? localUri.replace('file://', '') : localUri,
-                name: safeName,
-                type: 'image/jpeg',
+              const xhrBlob = await new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.onload = () => resolve(xhr.response);
+                xhr.onerror = (e) => reject(new TypeError('XHR file read failed'));
+                xhr.responseType = 'blob';
+                xhr.open('GET', localUri, true);
+                xhr.send(null);
               });
+              if (xhrBlob && xhrBlob.size > 0) {
+                formData.append('file', xhrBlob, safeName);
+                fileAttached = true;
+              }
+            } catch (err) {
+              console.warn('Avatar blob fallback:', err);
             }
+          }
+
+          if (!fileAttached) {
+            formData.append('file', {
+              uri: Platform.OS === 'ios' ? localUri.replace('file://', '') : localUri,
+              name: safeName,
+              type: 'image/jpeg',
+            });
           }
 
           const uploadRes = await fetch(`${BASE_URL}/profile/avatar`, {
