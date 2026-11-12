@@ -66,7 +66,7 @@ export const chatService = {
     }
   },
 
-  async sendDiagnosisImage(imageUri, mimeType, fileName, sessionId, token, base64Data) {
+  async sendDiagnosisImage(imageUri, mimeType, fileName, sessionId, token, base64Data, retryCount = 1) {
     let safeName = fileName ? String(fileName) : (String(imageUri).split('/').pop() || 'diagnostic.jpg');
     safeName = safeName.replace(/\.(heic|heif)$/i, '.jpg');
     if (!/\.(jpg|jpeg|png|webp)$/i.test(safeName)) {
@@ -109,6 +109,10 @@ export const chatService = {
         if (uploadResult.status >= 200 && uploadResult.status < 300) {
           return JSON.parse(uploadResult.body);
         } else {
+          if (uploadResult.status >= 500 && retryCount > 0) {
+            await new Promise(r => setTimeout(r, 1500));
+            return await this.sendDiagnosisImage(imageUri, mimeType, fileName, sessionId, token, base64Data, retryCount - 1);
+          }
           let errDetail = 'Erreur lors du diagnostic.';
           try {
             const parsed = JSON.parse(uploadResult.body);
@@ -192,6 +196,10 @@ export const chatService = {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
+        if (response.status >= 500 && retryCount > 0) {
+          await new Promise(r => setTimeout(r, 1500));
+          return await this.sendDiagnosisImage(imageUri, mimeType, fileName, sessionId, token, base64Data, retryCount - 1);
+        }
         const errorMsg = await _extractErrorMessage(response);
         const error = new Error(errorMsg);
         error.status = response.status;
@@ -249,6 +257,10 @@ export const chatService = {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
+        if (response.status >= 500 && retryCount > 0) {
+          await new Promise(r => setTimeout(r, 1500));
+          return await this.sendDiagnosisImage(imageUri, mimeType, fileName, sessionId, token, base64Data, retryCount - 1);
+        }
         const errorMsg = await _extractErrorMessage(response);
         const error = new Error(errorMsg);
         error.status = response.status;
